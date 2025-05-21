@@ -45,6 +45,7 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { performanceService, PerformanceReport } from "@/services/performanceService";
 import { supabase } from '@/lib/supabase';
+import * as XLSX from 'xlsx';
 
 const Performance: React.FC = () => {
   const [selectedWorkGroup, setSelectedWorkGroup] = useState<string>("all");
@@ -207,6 +208,28 @@ const Performance: React.FC = () => {
         startOfDay(date),
         endOfDay(date)
       );
+
+      // แปลงข้อมูลเป็นรูปแบบสำหรับ Excel
+      const worksheetData = data.map(item => ({
+        ทีม: item.team,
+        กลุ่มงาน: item.work_group,
+        'งานที่ได้รับ': item.total_assigned,
+        'งานที่จบแล้ว': item.total_completed,
+        'ยอด CURED': item.total_cured,
+        'ยอด DR': item.total_dr,
+        'ยอด REPO': item.total_repo,
+        'ยอดตบเด้ง': item.total_tap_deng,
+        'วันที่รายงาน': item.report_date,
+      }));
+
+      // สร้าง worksheet และ workbook
+      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Performance Report');
+
+      // Export ไฟล์ Excel
+      XLSX.writeFile(workbook, `Performance_Report_${format(date, 'yyyy-MM-dd')}.xlsx`);
+
       toast({
         title: "ดาวน์โหลดรายงานเป็น Excel สำเร็จ",
       });
