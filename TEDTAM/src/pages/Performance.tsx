@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
-import { customerService } from "@/services/customerService";
 import {
   Table,
   TableBody,
@@ -37,7 +35,7 @@ import {
 } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Bar, BarChart as RechartsBarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { th } from "date-fns/locale";
 import {
   Popover,
@@ -45,126 +43,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Customer } from "@/types/customer";
-
-// Define a type for the performance data
-interface PerformanceTeam {
-  "กลุ่มงาน6090": string;
-  "ทีมลพท": string;
-  "กลุ่มงาน6090รับงาน(จำนวน)": number;
-  "ยอด(princ)": string;
-  "กลุ่มงาน6090คงเหลือ(จำนวน)": number;
-  "6090ต้องเก็บงานกลุ่ม(Toral CURED)": number;
-  "6090ต้องเก็บงานกลุ่ม(DR)": number;
-  "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": number;
-  "6090ต้องเก็บงานกลุ่ม(REPO)": number;
-  "กลุ่มงานNPL": string;
-  "กลุ่มงานNPLรับงาน(จำนวน)": number;
-  "กลุ่มงานNPLยอด(princ)": string;
-  "กลุ่มงานNPLคงเหลือ(จำนวน)": number;
-  "NPLต้องเก็บงานกลุ่ม(DR)": number;
-  "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": number;
-  "NPLต้องเก็บงานกลุ่ม(REPO)": number;
-  "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": number;
-}
-
-const performanceData = [
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "นกแก้ว",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 83,
-    "ยอด(princ)": "19.88 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 34,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 5385527.39,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 795073.2,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": -997232.58,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": -1694968.84,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 10,
-    "กลุ่มงานNPLยอด(princ)": "1.64 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 5,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 245006.83,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": -29433.39,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": -254849.42,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 339
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "ออย",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 62,
-    "ยอด(princ)": "13.24 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 27,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 5157272.72,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 179383.77,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 885740.8,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": 1075228.85,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 2,
-    "กลุ่มงานNPLยอด(princ)": "0.23 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 2,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 34760.1,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": 62754.8,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": 30327.6,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 378
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "กุ้ง",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 60,
-    "ยอด(princ)": "15.15 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 19,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 3525218.19,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 605804.74,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 765157.67,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": -365305.78,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 7,
-    "กลุ่มงานNPLยอด(princ)": "1.70 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 4,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 252882.96,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": -98976.99,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": -20402.7,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 273
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "บาส",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 54,
-    "ยอด(princ)": "14.87 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 25,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 5487459.64,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 594967.65,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 644951.43,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": -522326.02,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 15,
-    "กลุ่มงานNPLยอด(princ)": "4.50 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 13,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 670517.24,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": 734692.99,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": 585015.04,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 199
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "โป้ง",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 25,
-    "ยอด(princ)": "6.45 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 13,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 1802289.16,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 257981.1,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 445017.41,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": 45143.24,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 15,
-    "กลุ่มงานNPLยอด(princ)": "4.50 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 13,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 670517.24,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": 734692.99,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": 585015.04,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 168
-  }
-];
+import { performanceService, PerformanceReport } from "@/services/performanceService";
+import { supabase } from '@/lib/supabase';
 
 const Performance: React.FC = () => {
   const [selectedWorkGroup, setSelectedWorkGroup] = useState<string>("all");
@@ -173,66 +53,77 @@ const Performance: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("summary");
   const [detailView, setDetailView] = useState<"6090" | "npl" | "all">("all");
   const [date, setDate] = useState<Date>(new Date());
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  
-  // โหลดข้อมูลลูกค้า
+  const [performanceData, setPerformanceData] = useState<PerformanceReport[]>([]);
+
+  // โหลดข้อมูล Performance จาก Supabase
   useEffect(() => {
-    const loadedCustomers = customerService.getCustomers();
-    setCustomers(loadedCustomers);
-  }, []);
-  
-  // คำนวณข้อมูลจาก customer data
-  const customerStats = useMemo(() => {
-    const stats = {
-      totalCustomers6090: 0,
-      totalCustomersNPL: 0,
-      completedTasks6090: 0,
-      completedTasksNPL: 0,
-      cured: 0,
-      dr: 0,
-      repo: 0,
-      tapDeng: 0
-    };
-    
-    customers.forEach(customer => {
-      if (customer.workGroup === "6090") {
-        stats.totalCustomers6090++;
-        if (customer.status === "จบ") stats.completedTasks6090++;
-      } else if (customer.workGroup === "NPL") {
-        stats.totalCustomersNPL++;
-        if (customer.status === "จบ") stats.completedTasksNPL++;
+    const loadPerformanceData = async () => {
+      try {
+        const data = await performanceService.getPerformanceData();
+        setPerformanceData(data);
+      } catch (error) {
+        console.error('Error loading performance data:', error);
+        toast({
+          title: "เกิดข้อผิดพลาด",
+          description: "ไม่สามารถโหลดข้อมูลได้",
+          variant: "destructive",
+        });
       }
-      
-      // คำนวณตามประเภท resus
-      if (customer.resus === "CURED") stats.cured += customer.principle;
-      else if (customer.resus === "DR") stats.dr += customer.principle;
-      else if (customer.resus === "REPO") stats.repo += customer.principle;
-      else if (customer.resus === "ตบเด้ง") stats.tapDeng += customer.principle;
-    });
-    
-    return stats;
-  }, [customers]);
-  
-  // Calculate total performance based on the data
+    };
+
+    loadPerformanceData();
+  }, [selectedPeriod, date]);
+
+  // Real-time subscription สำหรับ performance reports
+  useEffect(() => {
+    const subscription = supabase
+      .channel('performance_changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'performance_reports',
+      }, () => {
+        loadPerformanceData();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const loadPerformanceData = async () => {
+    try {
+      const data = await performanceService.getPerformanceData();
+      setPerformanceData(data);
+    } catch (error) {
+      console.error('Error loading performance data:', error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถโหลดข้อมูลได้",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // คำนวณข้อมูลจาก performance data
   const totalStats = useMemo(() => {
     return performanceData.reduce((acc, team) => {
-      // Sum up 6090 data
-      acc.totalAssigned6090 += team["กลุ่มงาน6090รับงาน(จำนวน)"];
-      acc.totalRemaining6090 += team["กลุ่มงาน6090คงเหลือ(จำนวน)"];
-      acc.totalCompleted6090 += (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]);
-      
-      // Sum up NPL data
-      acc.totalAssignedNPL += team["กลุ่มงานNPLรับงาน(จำนวน)"];
-      acc.totalRemainingNPL += team["กลุ่มงานNPLคงเหลือ(จำนวน)"];
-      acc.totalCompletedNPL += (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]);
-      
-      // Total Cured, DR, Repo values
-      acc.totalCured += team["6090ต้องเก็บงานกลุ่ม(Toral CURED)"];
-      acc.totalDR += (team["6090ต้องเก็บงานกลุ่ม(DR)"] + team["NPLต้องเก็บงานกลุ่ม(DR)"]);
-      acc.totalRepo += (team["6090ต้องเก็บงานกลุ่ม(REPO)"] + team["NPLต้องเก็บงานกลุ่ม(REPO)"]);
-      acc.totalTapDeng += (team["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] + team["NPLต้องเก็บงานกลุ่ม(ตบเด้ง)"]);
-      acc.totalReports += team["6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)"];
-      
+      if (team.work_group === "6090") {
+        acc.totalAssigned6090 += team.total_assigned;
+        acc.totalRemaining6090 += (team.total_assigned - team.total_completed);
+        acc.totalCompleted6090 += team.total_completed;
+      } else if (team.work_group === "NPL") {
+        acc.totalAssignedNPL += team.total_assigned;
+        acc.totalRemainingNPL += (team.total_assigned - team.total_completed);
+        acc.totalCompletedNPL += team.total_completed;
+      }
+
+      acc.totalCured += team.total_cured;
+      acc.totalDR += team.total_dr;
+      acc.totalRepo += team.total_repo;
+      acc.totalTapDeng += team.total_tap_deng;
+
       return acc;
     }, {
       totalAssigned6090: 0,
@@ -245,85 +136,89 @@ const Performance: React.FC = () => {
       totalDR: 0,
       totalRepo: 0,
       totalTapDeng: 0,
-      totalReports: 0
     });
   }, [performanceData]);
-  
-  // คำนวณข้อมูลจาก customer เพื่อแสดงผล
+
   const realStats = useMemo(() => {
-    // คำนวณสถิติจำนวนลูกค้าและผลงาน
-    const total = customerStats.totalCustomers6090 + customerStats.totalCustomersNPL;
-    const completed = customerStats.completedTasks6090 + customerStats.completedTasksNPL;
-    
-    // คำนวณอัตราส่วนของแต่ละประเภท
-    const totalResusAmount = customerStats.cured + customerStats.dr + customerStats.repo + customerStats.tapDeng;
-    const curedPercent = totalResusAmount > 0 ? Math.round((customerStats.cured / totalResusAmount) * 100) : 0;
-    const drPercent = totalResusAmount > 0 ? Math.round((customerStats.dr / totalResusAmount) * 100) : 0;
-    const repoPercent = totalResusAmount > 0 ? Math.round((customerStats.repo / totalResusAmount) * 100) : 0;
-    const tapDengPercent = totalResusAmount > 0 ? Math.round((customerStats.tapDeng / totalResusAmount) * 100) : 0;
-    
+    const total = totalStats.totalAssigned6090 + totalStats.totalAssignedNPL;
+    const completed = totalStats.totalCompleted6090 + totalStats.totalCompletedNPL;
+
+    const totalResusAmount = totalStats.totalCured + totalStats.totalDR + totalStats.totalRepo + totalStats.totalTapDeng;
+    const curedPercent = totalResusAmount > 0 ? Math.round((totalStats.totalCured / totalResusAmount) * 100) : 0;
+    const drPercent = totalResusAmount > 0 ? Math.round((totalStats.totalDR / totalResusAmount) * 100) : 0;
+    const repoPercent = totalResusAmount > 0 ? Math.round((totalStats.totalRepo / totalResusAmount) * 100) : 0;
+    const tapDengPercent = totalResusAmount > 0 ? Math.round((totalStats.totalTapDeng / totalResusAmount) * 100) : 0;
+
     return {
       total,
       completed,
       completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
       totalAmount: totalResusAmount,
-      commission: totalResusAmount * 0.03, // คิดค่าคอมมิชชัน 3%
+      commission: totalResusAmount * 0.03,
       curedPercent,
       drPercent,
       repoPercent,
-      tapDengPercent
+      tapDengPercent,
     };
-  }, [customerStats]);
-  
+  }, [totalStats]);
+
   const filteredPerformanceData = useMemo(() => {
     return performanceData.filter(item => {
       if (selectedWorkGroup !== "all" && 
-          (selectedWorkGroup === "6090" && item["กลุ่มงาน6090"] !== "กลุ่มงาน6090" || 
-           selectedWorkGroup === "NPL" && item["กลุ่มงานNPL"] !== "กลุ่มงานNPL")) {
+          (selectedWorkGroup === "6090" && item.work_group !== "6090" || 
+           selectedWorkGroup === "NPL" && item.work_group !== "NPL")) {
         return false;
       }
-      
-      if (selectedTeam !== "all" && item["ทีมลพท"] !== selectedTeam) {
+
+      if (selectedTeam !== "all" && item.team !== selectedTeam) {
         return false;
       }
-      
+
       return true;
     });
   }, [selectedWorkGroup, selectedTeam, performanceData]);
-  
-  // Create chart data
+
   const chartData = useMemo(() => {
     return filteredPerformanceData.map(team => ({
-      name: team["ทีมลพท"],
-      assigned: team["กลุ่มงาน6090รับงาน(จำนวน)"] + team["กลุ่มงานNPLรับงาน(จำนวน)"],
-      completed: (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]),
-      cured: Math.round(team["6090ต้องเก็บงานกลุ่ม(Toral CURED)"] / 100000) / 10,
-      dr: Math.round((team["6090ต้องเก็บงานกลุ่ม(DR)"] + team["NPLต้องเก็บงานกลุ่ม(DR)"]) / 100000) / 10,
-      tapDeng: Math.round((team["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] + team["NPLต้องเก็บงานกลุ่ม(ตบเด้ง)"]) / 100000) / 10,
-      repo: Math.round((team["6090ต้องเก็บงานกลุ่ม(REPO)"] + team["NPLต้องเก็บงานกลุ่ม(REPO)"]) / 100000) / 10
+      name: team.team,
+      assigned: team.total_assigned,
+      completed: team.total_completed,
+      cured: Math.round(team.total_cured / 100000) / 10,
+      dr: Math.round(team.total_dr / 100000) / 10,
+      tapDeng: Math.round(team.total_tap_deng / 100000) / 10,
+      repo: Math.round(team.total_repo / 100000) / 10,
     }));
   }, [filteredPerformanceData]);
-  
-  // Get unique teams for dropdown
+
   const teamOptions = useMemo(() => {
-    const teams = new Set(performanceData.map(item => item["ทีมลพท"]));
+    const teams = new Set(performanceData.map(item => item.team));
     return Array.from(teams);
   }, [performanceData]);
 
   const handleShare = () => {
     toast({
-      title: "แชร์รายงานผลงานสำเร็จ"
+      title: "แชร์รายงานผลงานสำเร็จ",
     });
   };
 
-  const handleExport = () => {
-    toast({
-      title: "ดาวน์โหลดรายงานเป็น Excel สำเร็จ"
-    });
+  const handleExport = async () => {
+    try {
+      const data = await performanceService.getPerformanceByDateRange(
+        startOfDay(date),
+        endOfDay(date)
+      );
+      toast({
+        title: "ดาวน์โหลดรายงานเป็น Excel สำเร็จ",
+      });
+    } catch (error) {
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถส่งออกข้อมูลได้",
+        variant: "destructive",
+      });
+    }
   };
-  
-  // Format number to display in Thai format
+
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
       return `${(num / 1000000).toFixed(2)} ล้าน`;
@@ -332,13 +227,12 @@ const Performance: React.FC = () => {
     }
     return num.toLocaleString('th-TH');
   };
-  
-  const renderTeamProgress = (team: PerformanceTeam) => {
-    const completed = (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                      (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]);
-    const total = team["กลุ่มงาน6090รับงาน(จำนวน)"] + team["กลุ่มงานNPLรับงาน(จำนวน)"];
+
+  const renderTeamProgress = (team: PerformanceReport) => {
+    const completed = team.total_completed;
+    const total = team.total_assigned;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-    
+
     return (
       <div>
         <div className="flex justify-between text-xs mb-1">
@@ -350,51 +244,48 @@ const Performance: React.FC = () => {
     );
   };
 
-  // เพิ่มฟังก์ชันสำหรับการแสดงผลข้อมูลแยกตามประเภท
   const getFilteredStats = (viewType: "6090" | "npl" | "all") => {
     if (viewType === "all") {
       return {
         assigned: realStats.total,
         completed: realStats.completed,
         remaining: realStats.total - realStats.completed,
-        percent: realStats.completionRate
+        percent: realStats.completionRate,
       };
     } else if (viewType === "6090") {
       return {
-        assigned: customerStats.totalCustomers6090,
-        completed: customerStats.completedTasks6090,
-        remaining: customerStats.totalCustomers6090 - customerStats.completedTasks6090,
-        percent: customerStats.totalCustomers6090 > 0 ? 
-          Math.round((customerStats.completedTasks6090 / customerStats.totalCustomers6090) * 100) : 0
+        assigned: totalStats.totalAssigned6090,
+        completed: totalStats.totalCompleted6090,
+        remaining: totalStats.totalRemaining6090,
+        percent: totalStats.totalAssigned6090 > 0 ? 
+          Math.round((totalStats.totalCompleted6090 / totalStats.totalAssigned6090) * 100) : 0,
       };
     } else {
       return {
-        assigned: customerStats.totalCustomersNPL,
-        completed: customerStats.completedTasksNPL,
-        remaining: customerStats.totalCustomersNPL - customerStats.completedTasksNPL,
-        percent: customerStats.totalCustomersNPL > 0 ? 
-          Math.round((customerStats.completedTasksNPL / customerStats.totalCustomersNPL) * 100) : 0
+        assigned: totalStats.totalAssignedNPL,
+        completed: totalStats.totalCompletedNPL,
+        remaining: totalStats.totalRemainingNPL,
+        percent: totalStats.totalAssignedNPL > 0 ? 
+          Math.round((totalStats.totalCompletedNPL / totalStats.totalAssignedNPL) * 100) : 0,
       };
     }
   };
-  
-  // สร้างข้อมูลสำหรับแต่ละทีม (ใช้ข้อมูลจาก customer)
+
   const teamPerformance = useMemo(() => {
-    // จัดกลุ่มข้อมูลลูกค้าตามทีม
     const teamData: Record<string, {
-      total6090: number,
-      totalNPL: number,
-      completed6090: number,
-      completedNPL: number,
-      cured: number,
-      dr: number,
-      repo: number,
-      tapDeng: number
+      total6090: number;
+      totalNPL: number;
+      completed6090: number;
+      completedNPL: number;
+      cured: number;
+      dr: number;
+      repo: number;
+      tapDeng: number;
     }> = {};
-    
-    customers.forEach(customer => {
-      if (!teamData[customer.team]) {
-        teamData[customer.team] = {
+
+    performanceData.forEach(item => {
+      if (!teamData[item.team]) {
+        teamData[item.team] = {
           total6090: 0,
           totalNPL: 0,
           completed6090: 0,
@@ -402,25 +293,24 @@ const Performance: React.FC = () => {
           cured: 0,
           dr: 0,
           repo: 0,
-          tapDeng: 0
+          tapDeng: 0,
         };
       }
-      
-      if (customer.workGroup === "6090") {
-        teamData[customer.team].total6090++;
-        if (customer.status === "จบ") teamData[customer.team].completed6090++;
-      } else if (customer.workGroup === "NPL") {
-        teamData[customer.team].totalNPL++;
-        if (customer.status === "จบ") teamData[customer.team].completedNPL++;
+
+      if (item.work_group === "6090") {
+        teamData[item.team].total6090 += item.total_assigned;
+        teamData[item.team].completed6090 += item.total_completed;
+      } else if (item.work_group === "NPL") {
+        teamData[item.team].totalNPL += item.total_assigned;
+        teamData[item.team].completedNPL += item.total_completed;
       }
-      
-      // คำนวณยอดตาม resus
-      if (customer.resus === "CURED") teamData[customer.team].cured += customer.principle;
-      else if (customer.resus === "DR") teamData[customer.team].dr += customer.principle;
-      else if (customer.resus === "REPO") teamData[customer.team].repo += customer.principle;
-      else if (customer.resus === "ตบเด้ง") teamData[customer.team].tapDeng += customer.principle;
+
+      teamData[item.team].cured += item.total_cured;
+      teamData[item.team].dr += item.total_dr;
+      teamData[item.team].repo += item.total_repo;
+      teamData[item.team].tapDeng += item.total_tap_deng;
     });
-    
+
     return Object.entries(teamData).map(([team, data]) => ({
       team,
       total: data.total6090 + data.totalNPL,
@@ -430,10 +320,10 @@ const Performance: React.FC = () => {
       cured: data.cured,
       dr: data.dr,
       repo: data.repo,
-      tapDeng: data.tapDeng
+      tapDeng: data.tapDeng,
     }));
-  }, [customers]);
-  
+  }, [performanceData]);
+
   return (
     <div className="p-4 pb-20">
       {/* Header with Date Picker */}
@@ -530,20 +420,19 @@ const Performance: React.FC = () => {
           <CardContent className="p-3">
             <p className="text-sm text-gray-500">งานทั้งหมด</p>
             <p className="text-xl font-bold">
-              {realStats.total || totalStats.totalAssigned6090 + totalStats.totalAssignedNPL}
+              {realStats.total}
             </p>
-            <p className="text-xs text-gray-400">เป้าหมาย {(realStats.total || (totalStats.totalAssigned6090 + totalStats.totalAssignedNPL)) + 20} ราย</p>
+            <p className="text-xs text-gray-400">เป้าหมาย {realStats.total + 20} ราย</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-green-500 card-shadow">
           <CardContent className="p-3">
             <p className="text-sm text-gray-500">จบงานแล้ว</p>
             <p className="text-xl font-bold">
-              {realStats.completed || totalStats.totalCompleted6090 + totalStats.totalCompletedNPL}
+              {realStats.completed}
             </p>
             <p className="text-xs text-green-500 font-medium">
-              {realStats.completionRate || Math.round(((totalStats.totalCompleted6090 + totalStats.totalCompletedNPL) / 
-                       (totalStats.totalAssigned6090 + totalStats.totalAssignedNPL)) * 100)}%
+              {realStats.completionRate}%
             </p>
           </CardContent>
         </Card>
@@ -551,7 +440,7 @@ const Performance: React.FC = () => {
           <CardContent className="p-3">
             <p className="text-sm text-gray-500">Principle</p>
             <p className="text-xl font-bold">
-              {formatNumber(realStats.totalAmount || totalStats.totalCured)}
+              {formatNumber(realStats.totalAmount)}
             </p>
             <div className="flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3 text-green-500" />
@@ -563,7 +452,7 @@ const Performance: React.FC = () => {
           <CardContent className="p-3">
             <p className="text-sm text-gray-500">คอมมิชชัน</p>
             <p className="text-xl font-bold">
-              {formatNumber(realStats.commission || totalStats.totalCured * 0.03)}
+              {formatNumber(realStats.commission)}
             </p>
             <div className="flex items-center">
               <Award className="h-3 w-3 text-purple-500 mr-1" />
@@ -598,30 +487,30 @@ const Performance: React.FC = () => {
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>CURED</span>
-                    <span>{realStats.curedPercent || 67}%</span>
+                    <span>{realStats.curedPercent}%</span>
                   </div>
-                  <Progress value={realStats.curedPercent || 67} className="h-2" />
+                  <Progress value={realStats.curedPercent} className="h-2" />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>DR</span>
-                    <span>{realStats.drPercent || 23}%</span>
+                    <span>{realStats.drPercent}%</span>
                   </div>
-                  <Progress value={realStats.drPercent || 23} className="h-2 bg-secondary [&>div]:bg-blue-500" />
+                  <Progress value={realStats.drPercent} className="h-2 bg-secondary [&>div]:bg-blue-500" />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>REPO</span>
-                    <span>{realStats.repoPercent || 8}%</span>
+                    <span>{realStats.repoPercent}%</span>
                   </div>
-                  <Progress value={realStats.repoPercent || 8} className="h-2 bg-secondary [&>div]:bg-red-500" />
+                  <Progress value={realStats.repoPercent} className="h-2 bg-secondary [&>div]:bg-red-500" />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>ตบเด้ง</span>
-                    <span>{realStats.tapDengPercent || 2}%</span>
+                    <span>{realStats.tapDengPercent}%</span>
                   </div>
-                  <Progress value={realStats.tapDengPercent || 2} className="h-2 bg-secondary [&>div]:bg-purple-500" />
+                  <Progress value={realStats.tapDengPercent} className="h-2 bg-secondary [&>div]:bg-purple-500" />
                 </div>
               </div>
             </CardContent>
@@ -659,7 +548,6 @@ const Performance: React.FC = () => {
                 </div>
               </div>
               
-              {/* แสดงค่าตามที่กรอง */}
               {(() => {
                 const stats = getFilteredStats(detailView);
                 return (
@@ -689,110 +577,88 @@ const Performance: React.FC = () => {
         
         <TabsContent value="byTeam">
           <div className="space-y-4">
-            {/* แสดงข้อมูลจาก teamPerformance แทน */}
-            {(teamPerformance.length > 0 ? teamPerformance : filteredPerformanceData).map((item, index) => {
-              const team = "team" in item ? item : {
-                team: item["ทีมลพท"],
-                total: item["กลุ่มงาน6090รับงาน(จำนวน)"] + item["กลุ่มงานNPLรับงาน(จำนวน)"],
-                totalCompleted: (item["กลุ่มงาน6090รับงาน(จำนวน)"] - item["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                              (item["กลุ่มงานNPLรับงาน(จำนวน)"] - item["กลุ่มงานNPLคงเหลือ(จำนวน)"]),
-                percentComplete: Math.round(((item["กลุ่มงาน6090รับงาน(จำนวน)"] - item["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                                           (item["กลุ่มงานNPLรับงาน(จำนวน)"] - item["กลุ่มงานNPLคงเหลือ(จำนวน)"])) /
-                                           (item["กลุ่มงาน6090รับงาน(จำนวน)"] + item["กลุ่มงานNPLรับงาน(จำนวน)"]) * 100),
-                cured: item["6090ต้องเก็บงานกลุ่ม(Toral CURED)"],
-                dr: item["6090ต้องเก็บงานกลุ่ม(DR)"] + item["NPLต้องเก็บงานกลุ่ม(DR)"],
-                repo: item["6090ต้องเก็บงานกลุ่ม(REPO)"] + item["NPLต้องเก็บงานกลุ่ม(REPO)"],
-                tapDeng: item["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] + item["NPLต้องเก็บงานกลุ่ม(ตบเด้ง)"]
-              };
-              
-              return (
-                <Card key={index} className="card-shadow">
-                  <CardContent className="p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center">
-                        <Badge className={`${index % 2 === 0 ? 'bg-tedtam-blue' : 'bg-tedtam-orange'} mr-2`}>
-                          {team.team.charAt(0)}
-                        </Badge>
-                        <h3 className="font-medium text-sm">ทีม {team.team}</h3>
-                      </div>
-                      
-                      {/* เพิ่มปุ่มกรองข้อมูลตามกลุ่มงาน */}
-                      <div className="flex">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 text-xs px-2"
-                          onClick={() => setDetailView("all")}
-                        >
-                          ทั้งหมด
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 text-xs px-2"
-                          onClick={() => setDetailView("6090")}
-                        >
-                          6090
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 text-xs px-2"
-                          onClick={() => setDetailView("npl")}
-                        >
-                          NPL
-                        </Button>
-                      </div>
+            {teamPerformance.map((item, index) => (
+              <Card key={index} className="card-shadow">
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center">
+                      <Badge className={`${index % 2 === 0 ? 'bg-tedtam-blue' : 'bg-tedtam-orange'} mr-2`}>
+                        {item.team.charAt(0)}
+                      </Badge>
+                      <h3 className="font-medium text-sm">ทีม {item.team}</h3>
                     </div>
-                    
-                    <div className="space-y-2 mb-3">
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span>ความคืบหน้า ({team.totalCompleted}/{team.total})</span>
-                          <span>{team.percentComplete}%</span>
-                        </div>
-                        <Progress value={team.percentComplete} className="h-2" />
-                      </div>
+                    <div className="flex">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-xs px-2"
+                        onClick={() => setDetailView("all")}
+                      >
+                        ทั้งหมด
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-xs px-2"
+                        onClick={() => setDetailView("6090")}
+                      >
+                        6090
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-xs px-2"
+                        onClick={() => setDetailView("npl")}
+                      >
+                        NPL
+                      </Button>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">CURED</p>
-                        <p className="font-medium">{formatNumber(team.cured || 0)}</p>
-                        <Progress value={Math.min(team.cured / 50000, 100)} className="h-1 mt-1" />
+                  </div>
+                  <div className="space-y-2 mb-3">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>ความคืบหน้า ({item.totalCompleted}/{item.total})</span>
+                        <span>{item.percentComplete}%</span>
                       </div>
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">DR</p>
-                        <p className="font-medium">{formatNumber(team.dr || 0)}</p>
-                        <Progress 
-                          value={Math.min(team.dr / 10000, 100)} 
-                          className="h-1 mt-1 [&>div]:bg-blue-500" 
-                        />
-                      </div>
+                      <Progress value={item.percentComplete} className="h-2" />
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">REPO</p>
-                        <p className="font-medium">{formatNumber(team.repo || 0)}</p>
-                        <Progress 
-                          value={Math.min(Math.abs(team.repo) / 10000, 100)} 
-                          className="h-1 mt-1 [&>div]:bg-red-500" 
-                        />
-                      </div>
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">ตบเด้ง</p>
-                        <p className="font-medium">{formatNumber(team.tapDeng || 0)}</p>
-                        <Progress 
-                          value={Math.min(Math.abs(team.tapDeng) / 10000, 100)} 
-                          className="h-1 mt-1 [&>div]:bg-purple-500" 
-                        />
-                      </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">CURED</p>
+                      <p className="font-medium">{formatNumber(item.cured)}</p>
+                      <Progress value={Math.min(item.cured / 50000, 100)} className="h-1 mt-1" />
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">DR</p>
+                      <p className="font-medium">{formatNumber(item.dr)}</p>
+                      <Progress 
+                        value={Math.min(item.dr / 10000, 100)} 
+                        className="h-1 mt-1 [&>div]:bg-blue-500" 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">REPO</p>
+                      <p className="font-medium">{formatNumber(item.repo)}</p>
+                      <Progress 
+                        value={Math.min(Math.abs(item.repo) / 10000, 100)} 
+                        className="h-1 mt-1 [&>div]:bg-red-500" 
+                      />
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <p className="text-xs text-gray-500">ตบเด้ง</p>
+                      <p className="font-medium">{formatNumber(item.tapDeng)}</p>
+                      <Progress 
+                        value={Math.min(Math.abs(item.tapDeng) / 10000, 100)} 
+                        className="h-1 mt-1 [&>div]:bg-purple-500" 
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
         
@@ -840,7 +706,6 @@ const Performance: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {/* แสดงตามฟิลเตอร์ที่เลือกไว้ */}
                     {filteredPerformanceData.map((team, index) => {
                       let assigned = 0;
                       let completed = 0;
@@ -848,22 +713,22 @@ const Performance: React.FC = () => {
                       let percentage = 0;
                       
                       if (detailView === "all" || detailView === "6090") {
-                        assigned += team["กลุ่มงาน6090รับงาน(จำนวน)"];
-                        completed += (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]);
-                        remaining += team["กลุ่มงาน6090คงเหลือ(จำนวน)"];
+                        assigned += team.total_assigned;
+                        completed += team.total_completed;
+                        remaining += (team.total_assigned - team.total_completed);
                       }
                       
                       if (detailView === "all" || detailView === "npl") {
-                        assigned += team["กลุ่มงานNPLรับงาน(จำนวน)"];
-                        completed += (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]);
-                        remaining += team["กลุ่มงานNPLคงเหลือ(จำนวน)"];
+                        assigned += team.total_assigned;
+                        completed += team.total_completed;
+                        remaining += (team.total_assigned - team.total_completed);
                       }
                       
                       percentage = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
                       
                       return (
                         <TableRow key={index}>
-                          <TableCell className="font-medium">{team["ทีมลพท"]}</TableCell>
+                          <TableCell className="font-medium">{team.team}</TableCell>
                           <TableCell className="text-right">{assigned}</TableCell>
                           <TableCell className="text-right">{completed}</TableCell>
                           <TableCell className="text-right text-green-500 font-medium">{percentage}%</TableCell>
