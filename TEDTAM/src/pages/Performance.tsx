@@ -56,7 +56,6 @@ const Performance: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [performanceData, setPerformanceData] = useState<PerformanceReport[]>([]);
 
-  // โหลดข้อมูล Performance จาก Supabase
   useEffect(() => {
     const loadPerformanceData = async () => {
       try {
@@ -68,6 +67,7 @@ const Performance: React.FC = () => {
           title: "เกิดข้อผิดพลาด",
           description: "ไม่สามารถโหลดข้อมูลได้",
           variant: "destructive",
+          duration: 3000, // เพิ่ม duration เพื่อให้ toast หายไปหลัง 3 วินาที
         });
       }
     };
@@ -75,7 +75,6 @@ const Performance: React.FC = () => {
     loadPerformanceData();
   }, [selectedPeriod, date]);
 
-  // Real-time subscription สำหรับ performance reports
   useEffect(() => {
     const subscription = supabase
       .channel('performance_changes')
@@ -103,11 +102,11 @@ const Performance: React.FC = () => {
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถโหลดข้อมูลได้",
         variant: "destructive",
+        duration: 3000, // เพิ่ม duration
       });
     }
   };
 
-  // คำนวณข้อมูลจาก performance data
   const totalStats = useMemo(() => {
     return performanceData.reduce((acc, team) => {
       if (team.work_group === "6090") {
@@ -199,6 +198,7 @@ const Performance: React.FC = () => {
   const handleShare = () => {
     toast({
       title: "แชร์รายงานผลงานสำเร็จ",
+      duration: 3000, // เพิ่ม duration เพื่อให้ toast หายไปหลัง 3 วินาที
     });
   };
 
@@ -209,7 +209,6 @@ const Performance: React.FC = () => {
         endOfDay(date)
       );
 
-      // แปลงข้อมูลเป็นรูปแบบสำหรับ Excel
       const worksheetData = data.map(item => ({
         ทีม: item.team,
         กลุ่มงาน: item.work_group,
@@ -222,22 +221,22 @@ const Performance: React.FC = () => {
         'วันที่รายงาน': item.report_date,
       }));
 
-      // สร้าง worksheet และ workbook
       const worksheet = XLSX.utils.json_to_sheet(worksheetData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Performance Report');
 
-      // Export ไฟล์ Excel
       XLSX.writeFile(workbook, `Performance_Report_${format(date, 'yyyy-MM-dd')}.xlsx`);
 
       toast({
         title: "ดาวน์โหลดรายงานเป็น Excel สำเร็จ",
+        duration: 3000, // เพิ่ม duration
       });
     } catch (error) {
       toast({
         title: "เกิดข้อผิดพลาด",
         description: "ไม่สามารถส่งออกข้อมูลได้",
         variant: "destructive",
+        duration: 3000, // เพิ่ม duration
       });
     }
   };
@@ -349,7 +348,6 @@ const Performance: React.FC = () => {
 
   return (
     <div className="p-4 pb-20">
-      {/* Header with Date Picker */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-xl font-bold text-tedtam-blue">ผลงาน</h1>
@@ -388,7 +386,6 @@ const Performance: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
         <Select value={selectedWorkGroup} onValueChange={setSelectedWorkGroup}>
           <SelectTrigger className="w-[140px]">
@@ -437,7 +434,6 @@ const Performance: React.FC = () => {
         </Select>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <Card className="border-l-4 border-l-tedtam-blue card-shadow">
           <CardContent className="p-3">
@@ -485,7 +481,6 @@ const Performance: React.FC = () => {
         </Card>
       </div>
 
-      {/* Performance Views */}
       <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList className="w-full mb-4">
           <TabsTrigger value="summary" className="flex-1">
@@ -829,7 +824,6 @@ const Performance: React.FC = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Leaderboard */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-tedtam-blue flex items-center">
