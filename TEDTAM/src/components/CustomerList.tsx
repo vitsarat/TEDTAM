@@ -6,11 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // เพิ่ม Select สำหรับการกรอง
 
 export function CustomerList() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', address: '' });
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [searchTerm, setSearchTerm] = useState(''); // ช่องค้นหา
+  const [sortBy, setSortBy] = useState<'name' | 'created_at'>('name'); // การเรียงลำดับ
   const { user } = useAuth();
 
   useEffect(() => {
@@ -21,14 +25,13 @@ export function CustomerList() {
       switch (payload.eventType) {
         case 'INSERT':
           setCustomers(prev => {
-            // ตรวจสอบว่า id ซ้ำหรือไม่
             if (prev.some(customer => customer.id === payload.new.id)) {
               console.warn('Duplicate customer ID detected in INSERT:', payload.new.id);
               return prev;
             }
             return [...prev, payload.new];
           });
-          toast.success('เพิ่มข้อมูลลูกค้าสสำเร็จ');
+          toast.success('เพิ่มข้อมูลลูกค้าสำเร็จ');
           break;
         case 'UPDATE':
           setCustomers(prev =>
@@ -52,11 +55,37 @@ export function CustomerList() {
     };
   }, []);
 
+  useEffect(() => {
+    // ค้นหาและเรียงลำดับข้อมูลเมื่อ customers, searchTerm, หรือ sortBy เปลี่ยนแปลง
+    let filtered = [...customers];
+
+    // ค้นหา
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(customer =>
+        customer.name.toLowerCase().includes(searchLower) ||
+        (customer.email && customer.email.toLowerCase().includes(searchLower)) ||
+        (customer.phone && customer.phone.includes(searchLower))
+      );
+    }
+
+    // เรียงลำดับ
+    filtered.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === 'created_at') {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      return 0;
+    });
+
+    setFilteredCustomers(filtered);
+  }, [customers, searchTerm, sortBy]);
+
   const loadCustomers = async () => {
     try {
       const data = await customerService.getCustomers();
       console.log('Initial customers loaded:', data);
-      // ตรวจสอบ id ซ้ำในข้อมูลเริ่มต้น
       const uniqueCustomers = Array.from(
         new Map(data.map(customer => [customer.id, customer])).values()
       );
@@ -147,6 +176,28 @@ export function CustomerList() {
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-4">รายการลูกค้า</h2>
 
+      {/* ช่องค้นหาและการเรียงลำดับ */}
+      <div className="mb-6 space-y-4">
+        <Input
+          placeholder="ค้นหา ชื่อ, อีเมล, หรือโทรศัพท์"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md"
+        />
+        <div className="flex items-center space-x-4">
+          <span>เรียงลำดับตาม:</span>
+          <Select value={sortBy} onValueChange={(value: 'name' | 'created_at') => setSortBy(value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="เลือกการเรียงลำดับ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">ชื่อ</SelectItem>
+              <SelectItem value="created_at">วันที่สร้าง (ใหม่ไปเก่า)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {/* ฟอร์มเพิ่มลูกค้า */}
       <form onSubmit={handleAddCustomer} className="mb-6 space-y-4">
         <Input
@@ -174,51 +225,78 @@ export function CustomerList() {
       </form>
 
       {/* รายการลูกค้า */}
-      {customers.length === 0 ? (
+      {filteredCustomers.length === 0 ? (
         <p>ไม่มีข้อมูลลูกค้า</p>
       ) : (
-        <ul className="space-y-2">
-          {customers.map(customer => (
-            <li key={customer.id} className="border p-2 rounded flex justify-between items-center">
-              {editingCustomer && editingCustomer.id === customer.id ? (
-                <>
-                  <div className="space-y-2">
-                    <Input
-                      value={editingCustomer.name}
-                      onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
-                    />
-                    <Input
-                      value={editingCustomer.email || ''}
-                      onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
-                    />
-                    <Input
-                      value={editingCustomer.phone || ''}
-                      onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
-                    />
-                    <Input
-                      value={editingCustomer.address || ''}
-                      onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Button onClick={() => handleEditCustomer(customer)} className="mr-2">บันทึก</Button>
-                    <Button onClick={() => setEditingCustomer(null)} variant="outline">ยกเลิก</Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span>
-                    {customer.name} - อีเมล: {customer.email || 'ไม่ระบุ'} - โทร: {customer.phone || 'ไม่ระบุ'}
-                  </span>
-                  <div>
-                    <Button onClick={() => handleEditCustomer(customer)} className="mr-2">แก้ไข</Button>
-                    <Button onClick={() => handleDeleteCustomer(customer.id)} variant="destructive">ลบ</Button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-gray-300 px-4 py-2 text-left">ชื่อ</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">อีเมล</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">โทรศัพท์</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">ที่อยู่</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">วันที่สร้าง</th>
+                <th className="border border-gray-300 px-4 py-2 text-left">การดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCustomers.map(customer => (
+                <tr key={customer.id} className="hover:bg-gray-50">
+                  {editingCustomer && editingCustomer.id === customer.id ? (
+                    <>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <Input
+                          value={editingCustomer.name}
+                          onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                        />
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <Input
+                          value={editingCustomer.email || ''}
+                          onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                        />
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <Input
+                          value={editingCustomer.phone || ''}
+                          onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                        />
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <Input
+                          value={editingCustomer.address || ''}
+                          onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
+                        />
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        {new Date(editingCustomer.created_at || '').toLocaleDateString()}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <Button onClick={() => handleEditCustomer(customer)} className="mr-2">บันทึก</Button>
+                        <Button onClick={() => setEditingCustomer(null)} variant="outline">ยกเลิก</Button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="border border-gray-300 px-4 py-2">{customer.name}</td>
+                      <td className="border border-gray-300 px-4 py-2">{customer.email || 'ไม่ระบุ'}</td>
+                      <td className="border border-gray-300 px-4 py-2">{customer.phone || 'ไม่ระบุ'}</td>
+                      <td className="border border-gray-300 px-4 py-2">{customer.address || 'ไม่ระบุ'}</td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        {new Date(customer.created_at || '').toLocaleDateString()}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <Button onClick={() => handleEditCustomer(customer)} className="mr-2">แก้ไข</Button>
+                        <Button onClick={() => handleDeleteCustomer(customer.id)} variant="destructive">ลบ</Button>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
