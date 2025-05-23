@@ -4,12 +4,14 @@ import type { Customer } from '@/types/customer';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner'; // เพิ่มการ import toast
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function CustomerList() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', address: '' });
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     loadCustomers();
@@ -18,8 +20,15 @@ export function CustomerList() {
       console.log('Received Realtime update:', payload);
       switch (payload.eventType) {
         case 'INSERT':
-          setCustomers(prev => [...prev, payload.new]);
-          toast.success('เพิ่มข้อมูลลูกค้าสำเร็จ'); // เพิ่มการแจ้งเตือน
+          setCustomers(prev => {
+            // ตรวจสอบว่า id ซ้ำหรือไม่
+            if (prev.some(customer => customer.id === payload.new.id)) {
+              console.warn('Duplicate customer ID detected in INSERT:', payload.new.id);
+              return prev;
+            }
+            return [...prev, payload.new];
+          });
+          toast.success('เพิ่มข้อมูลลูกค้าสสำเร็จ');
           break;
         case 'UPDATE':
           setCustomers(prev =>
@@ -47,7 +56,15 @@ export function CustomerList() {
     try {
       const data = await customerService.getCustomers();
       console.log('Initial customers loaded:', data);
-      setCustomers(data);
+      // ตรวจสอบ id ซ้ำในข้อมูลเริ่มต้น
+      const uniqueCustomers = Array.from(
+        new Map(data.map(customer => [customer.id, customer])).values()
+      );
+      if (uniqueCustomers.length !== data.length) {
+        console.warn('Duplicate customer IDs detected during initial load:', data);
+        toast.error('พบข้อมูลลูกค้าที่มี ID ซ้ำ กรุณาตรวจสอบใน Supabase');
+      }
+      setCustomers(uniqueCustomers);
     } catch (error) {
       console.error('Error loading customers:', error);
       toast.error('เกิดข้อผิดพลาดในการโหลดข้อมูลลูกค้า');
@@ -56,32 +73,56 @@ export function CustomerList() {
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast.error('กรุณาล็อกอินก่อนเพิ่มข้อมูล');
+      return;
+    }
+
+    if (!newCustomer.name) {
+      toast.error('กรุณากรอกชื่อ');
+      return;
+    }
+
     const customerToAdd = {
-      ...newCustomer,
-      user_id: 'YOUR_ADMIN_UUID', // แทนที่ด้วย UUID ของ admin@example.com
+      name: newCustomer.name,
+      email: newCustomer.email || null,
+      phone: newCustomer.phone || null,
+      address: newCustomer.address || null,
+      user_id: user.id,
     };
-    const addedCustomer = await customerService.addCustomer(customerToAdd);
-    if (addedCustomer) {
-      setNewCustomer({ name: '', email: '', phone: '', address: '' });
-      toast.success('เพิ่มลูกค้าสำเร็จจากหน้าเว็บ');
-    } else {
-      toast.error('เกิดข้อผิดพลาดในการเพิ่มลูกค้า');
+
+    try {
+      const addedCustomer = await customerService.addCustomer(customerToAdd);
+      if (addedCustomer) {
+        setNewCustomer({ name: '', email: '', phone: '', address: '' });
+        toast.success('เพิ่มลูกค้าสำเร็จจากหน้าเว็บ');
+      } else {
+        throw new Error('ไม่สามารถเพิ่มข้อมูลลูกค้าได้');
+      }
+    } catch (error: any) {
+      console.error('Error adding customer:', error);
+      toast.error(error.message || 'เกิดข้อผิดพลาดในการเพิ่มลูกค้า');
     }
   };
 
   const handleEditCustomer = async (customer: Customer) => {
     if (editingCustomer) {
-      const updatedCustomer = await customerService.updateCustomer(editingCustomer.id, {
-        name: editingCustomer.name,
-        email: editingCustomer.email,
-        phone: editingCustomer.phone,
-        address: editingCustomer.address,
-      });
-      if (updatedCustomer) {
-        setEditingCustomer(null);
-        toast.success('แก้ไขลูกค้าสำเร็จ');
-      } else {
-        toast.error('เกิดข้อผิดพลาดในการแก้ไขลูกค้า');
+      try {
+        const updatedCustomer = await customerService.updateCustomer(editingCustomer.id, {
+          name: editingCustomer.name,
+          email: editingCustomer.email || null,
+          phone: editingCustomer.phone || null,
+          address: editingCustomer.address || null,
+        });
+        if (updatedCustomer) {
+          setEditingCustomer(null);
+          toast.success('แก้ไขลูกค้าสำเร็จ');
+        } else {
+          throw new Error('ไม่สามารถอัปเดตข้อมูลลูกค้าได้');
+        }
+      } catch (error: any) {
+        console.error('Error updating customer:', error);
+        toast.error(error.message || 'เกิดข้อผิดพลาดในการแก้ไขลูกค้า');
       }
     } else {
       setEditingCustomer(customer);
@@ -89,11 +130,16 @@ export function CustomerList() {
   };
 
   const handleDeleteCustomer = async (id: string) => {
-    const success = await customerService.deleteCustomer(id);
-    if (success) {
-      toast.success('ลบลูกค้าสำเร็จ');
-    } else {
-      toast.error('เกิดข้อผิดพลาดในการลบลูกค้า');
+    try {
+      const success = await customerService.deleteCustomer(id);
+      if (success) {
+        toast.success('ลบลูกค้าสำเร็จ');
+      } else {
+        throw new Error('ไม่สามารถลบข้อมูลลูกค้าได้');
+      }
+    } catch (error: any) {
+      console.error('Error deleting customer:', error);
+      toast.error(error.message || 'เกิดข้อผิดพลาดในการลบลูกค้า');
     }
   };
 
