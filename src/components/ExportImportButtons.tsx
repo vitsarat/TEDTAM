@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { Download, Upload, Printer, FileText } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { Customer } from "@/types/customer";
 import { customerService } from "@/services/customerService";
@@ -26,7 +26,7 @@ const ExportImportButtons: React.FC<ExportImportButtonsProps> = ({
   const isAdmin = user?.role === 'admin';
 
   // Export customers to Excel
-  const handleExport = () => {
+  const handleExport = async () => {
     const fileType =
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
     const fileExtension = ".xlsx";
@@ -38,10 +38,28 @@ const ExportImportButtons: React.FC<ExportImportButtonsProps> = ({
       return exportCustomer;
     });
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = { Sheets: { Customers: ws }, SheetNames: ["Customers"] };
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const data = new Blob([excelBuffer], { type: fileType });
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Customers');
+
+    // Add headers
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: 'Name', key: 'name', width: 20 },
+      { header: 'Account Number', key: 'accountnumber', width: 20 },
+      { header: 'Principle', key: 'principle', width: 15 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Group Code', key: 'groupcode', width: 15 },
+      { header: 'Branch', key: 'branch', width: 20 },
+      { header: 'Brand', key: 'brand', width: 15 },
+      { header: 'Model', key: 'model', width: 15 },
+      { header: 'License Plate', key: 'licenseplate', width: 15 },
+    ];
+
+    // Add data rows
+    dataToExport.forEach(customer => worksheet.addRow(customer));
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const data = new Blob([buffer], { type: fileType });
     saveAs(data, `TEDTAM_Customers_${new Date().toISOString().split("T")[0]}${fileExtension}`);
 
     toast({
@@ -51,7 +69,7 @@ const ExportImportButtons: React.FC<ExportImportButtonsProps> = ({
   };
 
   // Import customers from Excel
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     // Check if user is admin
     if (!isAdmin) {
       toast({
@@ -66,83 +84,68 @@ const ExportImportButtons: React.FC<ExportImportButtonsProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const wb = XLSX.read(event.target?.result, { type: "binary" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+    const workbook = new ExcelJS.Workbook();
+    try {
+      const buffer = await file.arrayBuffer();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.getWorksheet('Customers');
 
-        // Process imported data
-        const importData: Record<string, any> = {};
-        let duplicateCount = 0;
-        
-        // Group by accountNumber and keep only the latest entries
-        // (assuming all records in the Excel file are from the latest update)
-        data.forEach((item: any) => {
-          if (item.name && item.accountNumber) {
-            // If this account number already exists in our import data, it's a duplicate
-            if (importData[item.accountNumber]) {
+      const importData: Record<string, any> = {};
+      let duplicateCount = 0;
+
+      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber > 1) { // Skip header row
+          const item: any = {};
+          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            const header = worksheet.getRow(1).getCell(colNumber).text.toLowerCase();
+            item[header] = cell.value;
+          });
+
+          if (item.name && item.accountnumber) {
+            if (importData[item.accountnumber]) {
               duplicateCount++;
             }
-            
-            // Always keep the latest record (last one encountered)
-            importData[item.accountNumber] = item;
+            importData[item.accountnumber] = item;
           }
-        });
-        
-        // Process the deduplicated data
-        let importCount = 0;
-        let updatedCount = 0;
-        let addedCount = 0;
-        
-        Object.values(importData).forEach((item: any) => {
-          // Check if customer with this account number already exists in the database
-          const existingCustomer = customerService.getCustomers().find(
-            (c) => c.accountNumber === item.accountNumber
-          );
+        }
+      });
 
-          if (existingCustomer) {
-            // Update existing customer
-            customerService.updateCustomer(existingCustomer.id, item);
-            updatedCount++;
-          } else {
-            // Add new customer
-            customerService.addCustomer(item as Omit<Customer, "id">);
-            addedCount++;
-          }
-          importCount++;
-        });
+      let importCount = 0;
+      let updatedCount = 0;
+      let addedCount = 0;
 
-        if (onImport) onImport();
-        
-        toast({
-          title: "นำเข้าข้อมูลสำเร็จ",
-          description: `นำเข้าข้อมูลลูกค้า ${importCount} รายการ (อัพเดต ${updatedCount}, เพิ่มใหม่ ${addedCount})` +
-                      (duplicateCount > 0 ? ` พบข้อมูลซ้ำ ${duplicateCount} รายการ ใช้ข้อมูลล่าสุดเท่านั้น` : ""),
-        });
+      for (const item of Object.values(importData)) {
+        const existingCustomer = customerService.getCustomers().find(
+          (c) => c.accountnumber === item.accountnumber
+        );
 
-        // Reset file input
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      } catch (error) {
-        console.error("Error importing file:", error);
-        toast({
-          title: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล",
-          description: "โปรดตรวจสอบรูปแบบไฟล์ Excel",
-          variant: "destructive",
-        });
+        if (existingCustomer) {
+          customerService.updateCustomer(existingCustomer.id, item);
+          updatedCount++;
+        } else {
+          customerService.addCustomer(item as Omit<Customer, "id">);
+          addedCount++;
+        }
+        importCount++;
       }
-    };
 
-    reader.onerror = () => {
+      if (onImport) onImport();
+
       toast({
-        title: "เกิดข้อผิดพลาดในการอ่านไฟล์",
+        title: "นำเข้าข้อมูลสำเร็จ",
+        description: `นำเข้าข้อมูลลูกค้า ${importCount} รายการ (อัพเดต ${updatedCount}, เพิ่มใหม่ ${addedCount})` +
+                    (duplicateCount > 0 ? ` พบข้อมูลซ้ำ ${duplicateCount} รายการ ใช้ข้อมูลล่าสุดเท่านั้น` : ""),
+      });
+
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (error) {
+      console.error("Error importing file:", error);
+      toast({
+        title: "เกิดข้อผิดพลาดในการนำเข้าข้อมูล",
+        description: "โปรดตรวจสอบรูปแบบไฟล์ Excel",
         variant: "destructive",
       });
-    };
-
-    reader.readAsBinaryString(file);
+    }
   };
 
   // Print customer list
@@ -150,7 +153,6 @@ const ExportImportButtons: React.FC<ExportImportButtonsProps> = ({
     if (onPrint) {
       onPrint();
     } else {
-      // Default print functionality
       window.print();
     }
     
