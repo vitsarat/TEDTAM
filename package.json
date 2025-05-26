@@ -1,8 +1,8 @@
 {
-  "name": "your-project-name",
+  "name": "vite_react_shadcn_ts",
   "private": true,
   "version": "0.0.0",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -39,16 +39,13 @@
     "@radix-ui/react-toggle": "^1.1.0",
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
-    "@supabase/supabase-js": "^2.49.8",
     "@tanstack/react-query": "^5.76.1",
     "@types/file-saver": "^2.0.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
-    "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.3.0",
-    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "input-otp": "^1.2.4",
     "leaflet": "^1.9.4",
@@ -66,6 +63,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.3",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -80,13 +78,11 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "lovable-tagger": "^1.1.7",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "tsx": "^4.19.4",
-    "typescript": "^5.8.3",
+    "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^6.3.5"
+    "vite": "^5.4.1"
   }
 }
