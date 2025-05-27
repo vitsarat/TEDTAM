@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Bell, ChevronRight, Sun, Cloud, CloudRain } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { customerService } from "@/services/customerService";
-import { NotificationPanel } from "@/components/dashboard/NotificationPanel";
 import { TaskTracker } from "@/components/dashboard/TaskTracker";
 import { NotepadWidget } from "@/components/dashboard/NotepadWidget";
 
@@ -63,8 +62,9 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="p-4">
-      {/* Notification Panel (Marquee) */}
+      {/* Remove these 2 lines
       <NotificationPanel />
+      */}
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6">

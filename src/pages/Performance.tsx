@@ -1,5 +1,6 @@
-
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
-import { customerService } from "@/services/customerService";
 import {
   Table,
   TableBody,
@@ -35,8 +35,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
-import { Bar, BarChart as RechartsBarChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import {
@@ -45,271 +43,375 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Customer } from "@/types/customer";
+import { performanceData as initialPerformanceData, updatePerformanceData } from "@/data/performanceData";
 
-// Define a type for the performance data
-interface PerformanceTeam {
-  "กลุ่มงาน6090": string;
-  "ทีมลพท": string;
-  "กลุ่มงาน6090รับงาน(จำนวน)": number;
-  "ยอด(princ)": string;
-  "กลุ่มงาน6090คงเหลือ(จำนวน)": number;
-  "6090ต้องเก็บงานกลุ่ม(Toral CURED)": number;
-  "6090ต้องเก็บงานกลุ่ม(DR)": number;
-  "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": number;
-  "6090ต้องเก็บงานกลุ่ม(REPO)": number;
-  "กลุ่มงานNPL": string;
-  "กลุ่มงานNPLรับงาน(จำนวน)": number;
-  "กลุ่มงานNPLยอด(princ)": string;
-  "กลุ่มงานNPLคงเหลือ(จำนวน)": number;
-  "NPLต้องเก็บงานกลุ่ม(DR)": number;
-  "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": number;
-  "NPLต้องเก็บงานกลุ่ม(REPO)": number;
-  "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": number;
-}
+// รายการสาขาและทีมงาน
+const branches = [
+  "ขอนแก่น",
+  "ขอนแก่นรุ่งเรือง",
+  "นครราชสีมา",
+  "นครสวรรค์",
+  "พัทยา",
+  "ระยอง",
+  "สระบุรี",
+  "อุดรธานี",
+  "อุดรธานีรุ่งเรือง",
+  "อุบลราชธานี",
+];
 
-const performanceData = [
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "นกแก้ว",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 83,
-    "ยอด(princ)": "19.88 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 34,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 5385527.39,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 795073.2,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": -997232.58,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": -1694968.84,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 10,
-    "กลุ่มงานNPLยอด(princ)": "1.64 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 5,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 245006.83,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": -29433.39,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": -254849.42,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 339
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "ออย",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 62,
-    "ยอด(princ)": "13.24 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 27,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 5157272.72,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 179383.77,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 885740.8,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": 1075228.85,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 2,
-    "กลุ่มงานNPLยอด(princ)": "0.23 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 2,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 34760.1,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": 62754.8,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": 30327.6,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 378
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "กุ้ง",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 60,
-    "ยอด(princ)": "15.15 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 19,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 3525218.19,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 605804.74,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 765157.67,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": -365305.78,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 7,
-    "กลุ่มงานNPLยอด(princ)": "1.70 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 4,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 252882.96,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": -98976.99,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": -20402.7,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 273
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "บาส",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 54,
-    "ยอด(princ)": "14.87 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 25,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 5487459.64,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 594967.65,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 644951.43,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": -522326.02,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 15,
-    "กลุ่มงานNPLยอด(princ)": "4.50 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 13,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 670517.24,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": 734692.99,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": 585015.04,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 199
-  },
-  {
-    "กลุ่มงาน6090": "กลุ่มงาน6090",
-    "ทีมลพท": "โป้ง",
-    "กลุ่มงาน6090รับงาน(จำนวน)": 25,
-    "ยอด(princ)": "6.45 ล้าน",
-    "กลุ่มงาน6090คงเหลือ(จำนวน)": 13,
-    "6090ต้องเก็บงานกลุ่ม(Toral CURED)": 1802289.16,
-    "6090ต้องเก็บงานกลุ่ม(DR)": 257981.1,
-    "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": 445017.41,
-    "6090ต้องเก็บงานกลุ่ม(REPO)": 45143.24,
-    "กลุ่มงานNPL": "กลุ่มงานNPL",
-    "กลุ่มงานNPLรับงาน(จำนวน)": 15,
-    "กลุ่มงานNPLยอด(princ)": "4.50 ล้าน",
-    "กลุ่มงานNPLคงเหลือ(จำนวน)": 13,
-    "NPLต้องเก็บงานกลุ่ม(DR)": 670517.24,
-    "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": 734692.99,
-    "NPLต้องเก็บงานกลุ่ม(REPO)": 585015.04,
-    "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": 168
-  }
+const teams = [
+  "เทวิน",
+  "เปเล่",
+  "เร",
+  "เอ",
+  "แดง",
+  "โป้ง",
+  "กุ้ง",
+  "ชัย",
+  "ธาดา",
+  "นกแก้ว",
+  "นาย",
+  "นุช",
+  "นิ่ม",
+  "บ๋อม",
+  "บอย",
+  "บาส",
+  "ประพัน",
+  "ผญบ",
+  "อ๊อฟ",
+  "ออย",
+  "อาร์ท",
+  "อิฐ",
+  "อุ๊",
+];
+
+// รายการกลุ่มงานสำหรับตัวกรอง
+const groups = [
+  { value: "all", label: "ทั้งหมด" },
+  { value: "6090", label: "กลุ่มงาน 6090" },
+  { value: "NPL", label: "กลุ่มงาน NPL" },
 ];
 
 const Performance: React.FC = () => {
-  const [selectedWorkGroup, setSelectedWorkGroup] = useState<string>("all");
+  const [performanceData, setPerformanceData] = useState(initialPerformanceData);
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [selectedGroup, setSelectedGroup] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("today");
   const [activeTab, setActiveTab] = useState<string>("summary");
-  const [detailView, setDetailView] = useState<"6090" | "npl" | "all">("all");
+  const [detailView, setDetailView] = useState<"all" | "6090" | "npl">("all");
   const [date, setDate] = useState<Date>(new Date());
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  
-  // โหลดข้อมูลลูกค้า
-  useEffect(() => {
-    const loadedCustomers = customerService.getCustomers();
-    setCustomers(loadedCustomers);
-  }, []);
-  
-  // คำนวณข้อมูลจาก customer data
-  const customerStats = useMemo(() => {
-    const stats = {
-      totalCustomers6090: 0,
-      totalCustomersNPL: 0,
-      completedTasks6090: 0,
-      completedTasksNPL: 0,
-      cured: 0,
-      dr: 0,
-      repo: 0,
-      tapDeng: 0
-    };
-    
-    customers.forEach(customer => {
-      if (customer.workGroup === "6090") {
-        stats.totalCustomers6090++;
-        if (customer.status === "จบ") stats.completedTasks6090++;
-      } else if (customer.workGroup === "NPL") {
-        stats.totalCustomersNPL++;
-        if (customer.status === "จบ") stats.completedTasksNPL++;
-      }
-      
-      // คำนวณตามประเภท resus
-      if (customer.resus === "CURED") stats.cured += customer.principle;
-      else if (customer.resus === "DR") stats.dr += customer.principle;
-      else if (customer.resus === "REPO") stats.repo += customer.principle;
-      else if (customer.resus === "ตบเด้ง") stats.tapDeng += customer.principle;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ฟังก์ชันอิมพอร์ตไฟล์ Excel
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const buffer = await file.arrayBuffer();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.getWorksheet(1);
+
+      const newData: any[] = [];
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) { // ข้ามหัวตาราง (แถวแรก)
+          const rawGroup = row.getCell(2).value;
+          const normalizedGroup = String(rawGroup).trim().replace(/\s+/g, '');
+          const groupValue = normalizedGroup === "6090" || normalizedGroup === "กลุ่มงาน6090" ? "กลุ่มงาน6090" : "กลุ่มงานNPL";
+
+          console.log("Raw group value from Excel:", rawGroup, "Normalized group:", normalizedGroup, "Transformed groupValue:", groupValue);
+
+          const rowData: any = {
+            กลุ่มงาน: groupValue,
+            ทีมลพท: row.getCell(3).value,
+            "กลุ่มงาน6090รับงาน(จำนวน)": row.getCell(4).value || 0,
+            "ยอด(princ)": row.getCell(5).value ? `${(row.getCell(5).value / 1000000).toFixed(2)} ล้าน` : "0 ล้าน",
+            "กลุ่มงาน6090คงเหลือ(จำนวน)": row.getCell(6).value || 0,
+            "6090ต้องเก็บงานกลุ่ม(Toral CURED)": row.getCell(7).value || 0,
+            "6090ต้องเก็บงานกลุ่ม(DR)": row.getCell(8).value || 0,
+            "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": row.getCell(9).value || 0,
+            "6090ต้องเก็บงานกลุ่ม(REPO)": row.getCell(10).value || 0,
+            "กลุ่มงานNPLรับงาน(จำนวน)": row.getCell(11).value || 0,
+            "กลุ่มงานNPLยอด(princ)": row.getCell(12).value ? `${(row.getCell(12).value / 1000000).toFixed(2)} ล้าน` : "0 ล้าน",
+            "กลุ่มงานNPLคงเหลือ(จำนวน)": row.getCell(13).value || 0,
+            "NPLต้องเก็บงานกลุ่ม(DR)": row.getCell(14).value || 0,
+            "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": row.getCell(15).value || 0,
+            "NPLต้องเก็บงานกลุ่ม(REPO)": row.getCell(16).value || 0,
+            "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": row.getCell(17).value || 0,
+            "เกรดเดือน(6090)": row.getCell(18).value || "N/A",
+            "Scoreเดือน(6090)": row.getCell(19).value || 0,
+            "เกรด3เดือน(6090)": row.getCell(20).value || "N/A",
+            "Score3เดือน(6090)": row.getCell(21).value || 0,
+            "ผลงาน(6090)(%Toral CURED)": row.getCell(22).value || 0,
+            "ผลงาน(6090)(%DR)": row.getCell(23).value || 0,
+            "ผลงาน(6090)(%ตบเด้ง)": row.getCell(24).value || 0,
+            "ผลงาน(6090)(%REPO)": row.getCell(25).value || 0,
+            "เกรดเดือน(NPL)": row.getCell(26).value || "N/A",
+            "Scoreเดือน(NPL)": row.getCell(27).value || 0,
+            "เกรด3เดือน(NPL)": row.getCell(28).value || "N/A",
+            "Score3เดือน(NPL)": row.getCell(29).value || 0,
+            "ผลงาน(NPL)(%Toral CURED)": row.getCell(30).value || 0,
+            "ผลงาน(NPL)(%DR)": row.getCell(31).value || 0,
+            "ผลงาน(NPL)(%ตบเด้ง)": row.getCell(32).value || 0,
+            "ผลงาน(NPL)(%REPO)": row.getCell(33).value || 0,
+          };
+          newData.push(rowData);
+        }
+      });
+
+      console.log("ข้อมูลที่อ่านจากไฟล์ Excel:", newData);
+
+      // อัปเดตข้อมูลใน performanceData และ state
+      setPerformanceData(newData);
+      updatePerformanceData(newData);
+
+      // รีเซ็ตตัวกรองเพื่อให้แสดงผลข้อมูลทั้งหมด
+      setSelectedBranch("all");
+      setSelectedTeam("all");
+      setSelectedGroup("all");
+      setSelectedPeriod("today");
+
+      toast({
+        title: "อิมพอร์ตไฟล์ Excel สำเร็จ",
+      });
+
+      // Log performanceData หลังการอัพเดต (ใช้ newData)
+      console.log("performanceData หลังการอัพเดต:", newData);
+    } catch (error) {
+      console.error("เกิดข้อผิดพลาดในการอิมพอร์ตไฟล์ Excel:", error);
+      toast({
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถอิมพอร์ตไฟล์ Excel ได้ กรุณาลองใหม่อีกครั้ง",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // ฟังก์ชันดาวน์โหลด Excel
+  const handleDownload = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Performance Data');
+
+    // กำหนดหัวตาราง
+    worksheet.columns = [
+      { header: 'ประเภท', key: 'ประเภท' },
+      { header: 'กลุ่มงาน', key: 'กลุ่มงาน' },
+      { header: 'ทีมลพท', key: 'ทีมลพท' },
+      { header: 'กลุ่มงาน6090รับงาน(จำนวน)', key: 'กลุ่มงาน6090รับงาน(จำนวน)' },
+      { header: 'ยอด(princ)', key: 'ยอด(princ)' },
+      { header: 'กลุ่มงาน6090คงเหลือ(จำนวน)', key: 'กลุ่มงาน6090คงเหลือ(จำนวน)' },
+      { header: '6090ต้องเก็บงานกลุ่ม(Toral CURED)', key: '6090ต้องเก็บงานกลุ่ม(Toral CURED)' },
+      { header: '6090ต้องเก็บงานกลุ่ม(DR)', key: '6090ต้องเก็บงานกลุ่ม(DR)' },
+      { header: '6090ต้องเก็บงานกลุ่ม(ตบเด้ง)', key: '6090ต้องเก็บงานกลุ่ม(ตบเด้ง)' },
+      { header: '6090ต้องเก็บงานกลุ่ม(REPO)', key: '6090ต้องเก็บงานกลุ่ม(REPO)' },
+      { header: 'กลุ่มงานNPLรับงาน(จำนวน)', key: 'กลุ่มงานNPLรับงาน(จำนวน)' },
+      { header: 'กลุ่มงานNPLยอด(princ)', key: 'กลุ่มงานNPLยอด(princ)' },
+      { header: 'กลุ่มงานNPLคงเหลือ(จำนวน)', key: 'กลุ่มงานNPLคงเหลือ(จำนวน)' },
+      { header: 'NPLต้องเก็บงานกลุ่ม(DR)', key: 'NPLต้องเก็บงานกลุ่ม(DR)' },
+      { header: 'NPLต้องเก็บงานกลุ่ม(ตบเด้ง)', key: 'NPLต้องเก็บงานกลุ่ม(ตบเด้ง)' },
+      { header: 'NPLต้องเก็บงานกลุ่ม(REPO)', key: 'NPLต้องเก็บงานกลุ่ม(REPO)' },
+      { header: '6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)', key: '6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)' },
+      { header: 'เกรดเดือน(6090)', key: 'เกรดเดือน(6090)' },
+      { header: 'Scoreเดือน(6090)', key: 'Scoreเดือน(6090)' },
+      { header: 'เกรด3เดือน(6090)', key: 'เกรด3เดือน(6090)' },
+      { header: 'Score3เดือน(6090)', key: 'Score3เดือน(6090)' },
+      { header: 'ผลงาน(6090)(%Toral CURED)', key: 'ผลงาน(6090)(%Toral CURED)' },
+      { header: 'ผลงาน(6090)(%DR)', key: 'ผลงาน(6090)(%DR)' },
+      { header: 'ผลงาน(6090)(%ตบเด้ง)', key: 'ผลงาน(6090)(%ตบเด้ง)' },
+      { header: 'ผลงาน(6090)(%REPO)', key: 'ผลงาน(6090)(%REPO)' },
+      { header: 'เกรดเดือน(NPL)', key: 'เกรดเดือน(NPL)' },
+      { header: 'Scoreเดือน(NPL)', key: 'Scoreเดือน(NPL)' },
+      { header: 'เกรด3เดือน(NPL)', key: 'เกรด3เดือน(NPL)' },
+      { header: 'Score3เดือน(NPL)', key: 'Score3เดือน(NPL)' },
+      { header: 'ผลงาน(NPL)(%Toral CURED)', key: 'ผลงาน(NPL)(%Toral CURED)' },
+      { header: 'ผลงาน(NPL)(%DR)', key: 'ผลงาน(NPL)(%DR)' },
+      { header: 'ผลงาน(NPL)(%ตบเด้ง)', key: 'ผลงาน(NPL)(%ตบเด้ง)' },
+      { header: 'ผลงาน(NPL)(%REPO)', key: 'ผลงาน(NPL)(%REPO)' },
+    ];
+
+    // เพิ่มข้อมูลลงใน worksheet
+    performanceData.forEach(item => {
+      worksheet.addRow({
+        ประเภท: "สาขา",
+        กลุ่มงาน: item.กลุ่มงาน,
+        ทีมลพท: item.ทีมลพท,
+        "กลุ่มงาน6090รับงาน(จำนวน)": item["กลุ่มงาน6090รับงาน(จำนวน)"],
+        "ยอด(princ)": item["ยอด(princ)"],
+        "กลุ่มงาน6090คงเหลือ(จำนวน)": item["กลุ่มงาน6090คงเหลือ(จำนวน)"],
+        "6090ต้องเก็บงานกลุ่ม(Toral CURED)": item["6090ต้องเก็บงานกลุ่ม(Toral CURED)"],
+        "6090ต้องเก็บงานกลุ่ม(DR)": item["6090ต้องเก็บงานกลุ่ม(DR)"],
+        "6090ต้องเก็บงานกลุ่ม(ตบเด้ง)": item["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"],
+        "6090ต้องเก็บงานกลุ่ม(REPO)": item["6090ต้องเก็บงานกลุ่ม(REPO)"],
+        "กลุ่มงานNPLรับงาน(จำนวน)": item["กลุ่มงานNPLรับงาน(จำนวน)"],
+        "กลุ่มงานNPLยอด(princ)": item["กลุ่มงานNPLยอด(princ)"],
+        "กลุ่มงานNPLคงเหลือ(จำนวน)": item["กลุ่มงานNPLคงเหลือ(จำนวน)"],
+        "NPLต้องเก็บงานกลุ่ม(DR)": item["NPLต้องเก็บงานกลุ่ม(DR)"],
+        "NPLต้องเก็บงานกลุ่ม(ตบเด้ง)": item["NPLต้องเก็บงานกลุ่ม(ตบเด้ง)"],
+        "NPLต้องเก็บงานกลุ่ม(REPO)": item["NPLต้องเก็บงานกลุ่ม(REPO)"],
+        "6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)": item["6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)"],
+        "เกรดเดือน(6090)": item["เกรดเดือน(6090)"],
+        "Scoreเดือน(6090)": item["Scoreเดือน(6090)"],
+        "เกรด3เดือน(6090)": item["เกรด3เดือน(6090)"],
+        "Score3เดือน(6090)": item["Score3เดือน(6090)"],
+        "ผลงาน(6090)(%Toral CURED)": item["ผลงาน(6090)(%Toral CURED)"],
+        "ผลงาน(6090)(%DR)": item["ผลงาน(6090)(%DR)"],
+        "ผลงาน(6090)(%ตบเด้ง)": item["ผลงาน(6090)(%ตบเด้ง)"],
+        "ผลงาน(6090)(%REPO)": item["ผลงาน(6090)(%REPO)"],
+        "เกรดเดือน(NPL)": item["เกรดเดือน(NPL)"],
+        "Scoreเดือน(NPL)": item["Scoreเดือน(NPL)"],
+        "เกรด3เดือน(NPL)": item["เกรด3เดือน(NPL)"],
+        "Score3เดือน(NPL)": item["Score3เดือน(NPL)"],
+        "ผลงาน(NPL)(%Toral CURED)": item["ผลงาน(NPL)(%Toral CURED)"],
+        "ผลงาน(NPL)(%DR)": item["ผลงาน(NPL)(%DR)"],
+        "ผลงาน(NPL)(%ตบเด้ง)": item["ผลงาน(NPL)(%ตบเด้ง)"],
+        "ผลงาน(NPL)(%REPO)": item["ผลงาน(NPL)(%REPO)"],
+      });
     });
-    
-    return stats;
-  }, [customers]);
-  
-  // Calculate total performance based on the data
+
+    // สร้างไฟล์ Excel และดาวน์โหลด
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `Performance_Data_${format(date, "yyyy-MM-dd")}.xlsx`);
+    toast({
+      title: "ดาวน์โหลดไฟล์ Excel สำเร็จ",
+    });
+  };
+
+  // คำนวณข้อมูลรวม
   const totalStats = useMemo(() => {
     return performanceData.reduce((acc, team) => {
-      // Sum up 6090 data
-      acc.totalAssigned6090 += team["กลุ่มงาน6090รับงาน(จำนวน)"];
-      acc.totalRemaining6090 += team["กลุ่มงาน6090คงเหลือ(จำนวน)"];
-      acc.totalCompleted6090 += (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]);
-      
-      // Sum up NPL data
-      acc.totalAssignedNPL += team["กลุ่มงานNPLรับงาน(จำนวน)"];
-      acc.totalRemainingNPL += team["กลุ่มงานNPLคงเหลือ(จำนวน)"];
-      acc.totalCompletedNPL += (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]);
-      
-      // Total Cured, DR, Repo values
-      acc.totalCured += team["6090ต้องเก็บงานกลุ่ม(Toral CURED)"];
-      acc.totalDR += (team["6090ต้องเก็บงานกลุ่ม(DR)"] + team["NPLต้องเก็บงานกลุ่ม(DR)"]);
-      acc.totalRepo += (team["6090ต้องเก็บงานกลุ่ม(REPO)"] + team["NPLต้องเก็บงานกลุ่ม(REPO)"]);
-      acc.totalTapDeng += (team["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] + team["NPLต้องเก็บงานกลุ่ม(ตบเด้ง)"]);
-      acc.totalReports += team["6090ต้องเก็บงานกลุ่ม(คีย์รายงาน)"];
-      
+      acc.totalAssigned6090 += team["กลุ่มงาน6090รับงาน(จำนวน)"] || 0;
+      acc.totalRemaining6090 += team["กลุ่มงาน6090คงเหลือ(จำนวน)"] || 0;
+      acc.totalCompleted6090 += (team["กลุ่มงาน6090รับงาน(จำนวน)"] || 0) - (team["กลุ่มงาน6090คงเหลือ(จำนวน)"] || 0);
+      acc.totalCured += team["6090ต้องเก็บงานกลุ่ม(Toral CURED)"] || 0;
+      acc.totalDR += team["6090ต้องเก็บงานกลุ่ม(DR)"] || 0;
+      acc.totalTapDeng += team["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] || 0;
+      acc.totalRepo += team["6090ต้องเก็บงานกลุ่ม(REPO)"] || 0;
       return acc;
     }, {
       totalAssigned6090: 0,
       totalRemaining6090: 0,
       totalCompleted6090: 0,
-      totalAssignedNPL: 0,
-      totalRemainingNPL: 0,
-      totalCompletedNPL: 0,
       totalCured: 0,
       totalDR: 0,
-      totalRepo: 0,
       totalTapDeng: 0,
-      totalReports: 0
+      totalRepo: 0,
     });
   }, [performanceData]);
-  
-  // คำนวณข้อมูลจาก customer เพื่อแสดงผล
-  const realStats = useMemo(() => {
-    // คำนวณสถิติจำนวนลูกค้าและผลงาน
-    const total = customerStats.totalCustomers6090 + customerStats.totalCustomersNPL;
-    const completed = customerStats.completedTasks6090 + customerStats.completedTasksNPL;
-    
-    // คำนวณอัตราส่วนของแต่ละประเภท
-    const totalResusAmount = customerStats.cured + customerStats.dr + customerStats.repo + customerStats.tapDeng;
-    const curedPercent = totalResusAmount > 0 ? Math.round((customerStats.cured / totalResusAmount) * 100) : 0;
-    const drPercent = totalResusAmount > 0 ? Math.round((customerStats.dr / totalResusAmount) * 100) : 0;
-    const repoPercent = totalResusAmount > 0 ? Math.round((customerStats.repo / totalResusAmount) * 100) : 0;
-    const tapDengPercent = totalResusAmount > 0 ? Math.round((customerStats.tapDeng / totalResusAmount) * 100) : 0;
-    
-    return {
-      total,
-      completed,
-      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
-      totalAmount: totalResusAmount,
-      commission: totalResusAmount * 0.03, // คิดค่าคอมมิชชัน 3%
-      curedPercent,
-      drPercent,
-      repoPercent,
-      tapDengPercent
-    };
-  }, [customerStats]);
-  
+
+  // กรองข้อมูลตามตัวกรอง
   const filteredPerformanceData = useMemo(() => {
-    return performanceData.filter(item => {
-      if (selectedWorkGroup !== "all" && 
-          (selectedWorkGroup === "6090" && item["กลุ่มงาน6090"] !== "กลุ่มงาน6090" || 
-           selectedWorkGroup === "NPL" && item["กลุ่มงานNPL"] !== "กลุ่มงานNPL")) {
+    const filtered = performanceData.filter(item => {
+      // Log เพื่อตรวจสอบค่า กลุ่มงาน
+      console.log("item.กลุ่มงาน:", item.กลุ่มงาน, "selectedGroup:", selectedGroup);
+
+      // กรองตามกลุ่มงาน (มาก่อนเพื่อป้องกันการกรองซ้ำซ้อน)
+      if (selectedGroup !== "all") {
+        const groupValue = item.กลุ่มงาน?.trim(); // ลบช่องว่างหน้า-หลัง
+        console.log("groupValue after trim:", groupValue); // Log เพื่อตรวจสอบค่า groupValue
+        if (selectedGroup === "6090" && groupValue !== "กลุ่มงาน6090") {
+          console.log("Filtered out (6090):", item.ทีมลพท);
+          return false;
+        }
+        if (selectedGroup === "NPL" && groupValue !== "กลุ่มงานNPL") {
+          console.log("Filtered out (NPL):", item.ทีมลพท);
+          return false;
+        }
+      }
+
+      // กรองตามสาขา
+      if (selectedBranch !== "all" && !branches.includes(item.ทีมลพท)) {
+        console.log("Filtered out (branch):", item.ทีมลพท);
         return false;
       }
-      
-      if (selectedTeam !== "all" && item["ทีมลพท"] !== selectedTeam) {
+      if (selectedBranch !== "all" && item.ทีมลพท !== selectedBranch) {
+        console.log("Filtered out (branch match):", item.ทีมลพท);
         return false;
       }
-      
+
+      // กรองตามทีมงาน
+      if (selectedTeam !== "all" && item.ทีมลพท !== selectedTeam) {
+        console.log("Filtered out (team):", item.ทีมลพท);
+        return false;
+      }
+
+      // Log รายการที่ผ่านการกรอง
+      console.log("Item passed filters:", item.ทีมลพท, "กลุ่มงาน:", item.กลุ่มงาน);
       return true;
     });
-  }, [selectedWorkGroup, selectedTeam, performanceData]);
-  
-  // Create chart data
-  const chartData = useMemo(() => {
-    return filteredPerformanceData.map(team => ({
-      name: team["ทีมลพท"],
-      assigned: team["กลุ่มงาน6090รับงาน(จำนวน)"] + team["กลุ่มงานNPLรับงาน(จำนวน)"],
-      completed: (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]),
-      cured: Math.round(team["6090ต้องเก็บงานกลุ่ม(Toral CURED)"] / 100000) / 10,
-      dr: Math.round((team["6090ต้องเก็บงานกลุ่ม(DR)"] + team["NPLต้องเก็บงานกลุ่ม(DR)"]) / 100000) / 10,
-      tapDeng: Math.round((team["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] + team["NPLต้องเก็บงานกลุ่ม(ตบเด้ง)"]) / 100000) / 10,
-      repo: Math.round((team["6090ต้องเก็บงานกลุ่ม(REPO)"] + team["NPLต้องเก็บงานกลุ่ม(REPO)"]) / 100000) / 10
-    }));
+
+    // Log รายการทั้งหมดใน filteredPerformanceData
+    console.log("filteredPerformanceData:", filtered);
+    filtered.forEach(item => {
+      console.log("Filtered item - ทีมลพท:", item.ทีมลพท, "กลุ่มงาน:", item.กลุ่มงาน);
+    });
+
+    return filtered;
+  }, [selectedBranch, selectedTeam, selectedGroup, performanceData]);
+
+  // Log filteredPerformanceData เพื่อตรวจสอบ
+  useEffect(() => {
+    console.log("filteredPerformanceData:", filteredPerformanceData);
   }, [filteredPerformanceData]);
-  
-  // Get unique teams for dropdown
-  const teamOptions = useMemo(() => {
-    const teams = new Set(performanceData.map(item => item["ทีมลพท"]));
-    return Array.from(teams);
-  }, [performanceData]);
+
+  // คำนวณข้อมูลสำหรับ Summary Cards
+  const summaryStats = useMemo(() => {
+    const filteredData = filteredPerformanceData; // ใช้ filteredPerformanceData แทน performanceData
+
+    const gradeMonth = filteredData.length > 0 ? filteredData[0]["เกรดเดือน(6090)"] : "N/A";
+    const scoreMonth = filteredData.length > 0 ? filteredData[0]["Scoreเดือน(6090)"] : 0;
+    const gradeThreeMonths = filteredData.length > 0 ? filteredData[0]["เกรด3เดือน(6090)"] : "N/A";
+    const scoreThreeMonths = filteredData.length > 0 ? filteredData[0]["Score3เดือน(6090)"] : 0;
+
+    return {
+      gradeMonth,
+      scoreMonth,
+      gradeThreeMonths,
+      scoreThreeMonths,
+    };
+  }, [selectedBranch, selectedTeam, selectedGroup, filteredPerformanceData]);
+
+  // คำนวณข้อมูลสำหรับ Progress Bar
+  const progressStats = useMemo(() => {
+    const totals = filteredPerformanceData.reduce((acc, item) => {
+      acc.cured += item["ผลงาน(6090)(%Toral CURED)"] || 0;
+      acc.dr += item["ผลงาน(6090)(%DR)"] || 0;
+      acc.tapDeng += item["ผลงาน(6090)(%ตบเด้ง)"] || 0;
+      acc.repo += item["ผลงาน(6090)(%REPO)"] || 0;
+      return acc;
+    }, { cured: 0, dr: 0, tapDeng: 0, repo: 0 });
+
+    const count = filteredPerformanceData.length || 1;
+    return {
+      curedPercent: (totals.cured / count) * 100,
+      drPercent: (totals.dr / count) * 100,
+      tapDengPercent: (totals.tapDeng / count) * 100,
+      repoPercent: (totals.repo / count) * 100,
+    };
+  }, [filteredPerformanceData]);
+
+  // คำนวณข้อมูลสำหรับเป้าหมายที่ยังขาด
+  const difStats = useMemo(() => {
+    const totals = filteredPerformanceData.reduce((acc, item) => {
+      acc.cured += item["6090ต้องเก็บงานกลุ่ม(Toral CURED)"] || 0;
+      acc.dr += item["6090ต้องเก็บงานกลุ่ม(DR)"] || 0;
+      acc.tapDeng += item["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] || 0;
+      acc.repo += item["6090ต้องเก็บงานกลุ่ม(REPO)"] || 0;
+      return acc;
+    }, { cured: 0, dr: 0, tapDeng: 0, repo: 0 });
+
+    return {
+      difCured: totals.cured,
+      difDR: totals.dr,
+      difTapDeng: totals.tapDeng,
+      difRepo: totals.repo,
+    };
+  }, [filteredPerformanceData]);
+
+  // รายการทีมงานสำหรับตัวกรอง (ใช้ teams ที่กำหนดไว้)
+  const teamOptions = teams;
 
   const handleShare = () => {
     toast({
@@ -317,123 +419,19 @@ const Performance: React.FC = () => {
     });
   };
 
-  const handleExport = () => {
-    toast({
-      title: "ดาวน์โหลดรายงานเป็น Excel สำเร็จ"
-    });
-  };
-  
-  // Format number to display in Thai format
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
       return `${(num / 1000000).toFixed(2)} ล้าน`;
     } else if (num >= 1000) {
       return `${(num / 1000).toFixed(1)}K`;
     }
-    return num.toLocaleString('th-TH');
-  };
-  
-  const renderTeamProgress = (team: PerformanceTeam) => {
-    const completed = (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                      (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]);
-    const total = team["กลุ่มงาน6090รับงาน(จำนวน)"] + team["กลุ่มงานNPLรับงาน(จำนวน)"];
-    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-    
-    return (
-      <div>
-        <div className="flex justify-between text-xs mb-1">
-          <span>ความคืบหน้า ({completed}/{total})</span>
-          <span>{percent}%</span>
-        </div>
-        <Progress value={percent} className="h-2" />
-      </div>
-    );
+    return num.toLocaleString('th-TH', { minimumFractionDigits: 2 });
   };
 
-  // เพิ่มฟังก์ชันสำหรับการแสดงผลข้อมูลแยกตามประเภท
-  const getFilteredStats = (viewType: "6090" | "npl" | "all") => {
-    if (viewType === "all") {
-      return {
-        assigned: realStats.total,
-        completed: realStats.completed,
-        remaining: realStats.total - realStats.completed,
-        percent: realStats.completionRate
-      };
-    } else if (viewType === "6090") {
-      return {
-        assigned: customerStats.totalCustomers6090,
-        completed: customerStats.completedTasks6090,
-        remaining: customerStats.totalCustomers6090 - customerStats.completedTasks6090,
-        percent: customerStats.totalCustomers6090 > 0 ? 
-          Math.round((customerStats.completedTasks6090 / customerStats.totalCustomers6090) * 100) : 0
-      };
-    } else {
-      return {
-        assigned: customerStats.totalCustomersNPL,
-        completed: customerStats.completedTasksNPL,
-        remaining: customerStats.totalCustomersNPL - customerStats.completedTasksNPL,
-        percent: customerStats.totalCustomersNPL > 0 ? 
-          Math.round((customerStats.completedTasksNPL / customerStats.totalCustomersNPL) * 100) : 0
-      };
-    }
-  };
-  
-  // สร้างข้อมูลสำหรับแต่ละทีม (ใช้ข้อมูลจาก customer)
-  const teamPerformance = useMemo(() => {
-    // จัดกลุ่มข้อมูลลูกค้าตามทีม
-    const teamData: Record<string, {
-      total6090: number,
-      totalNPL: number,
-      completed6090: number,
-      completedNPL: number,
-      cured: number,
-      dr: number,
-      repo: number,
-      tapDeng: number
-    }> = {};
-    
-    customers.forEach(customer => {
-      if (!teamData[customer.team]) {
-        teamData[customer.team] = {
-          total6090: 0,
-          totalNPL: 0,
-          completed6090: 0,
-          completedNPL: 0,
-          cured: 0,
-          dr: 0,
-          repo: 0,
-          tapDeng: 0
-        };
-      }
-      
-      if (customer.workGroup === "6090") {
-        teamData[customer.team].total6090++;
-        if (customer.status === "จบ") teamData[customer.team].completed6090++;
-      } else if (customer.workGroup === "NPL") {
-        teamData[customer.team].totalNPL++;
-        if (customer.status === "จบ") teamData[customer.team].completedNPL++;
-      }
-      
-      // คำนวณยอดตาม resus
-      if (customer.resus === "CURED") teamData[customer.team].cured += customer.principle;
-      else if (customer.resus === "DR") teamData[customer.team].dr += customer.principle;
-      else if (customer.resus === "REPO") teamData[customer.team].repo += customer.principle;
-      else if (customer.resus === "ตบเด้ง") teamData[customer.team].tapDeng += customer.principle;
-    });
-    
-    return Object.entries(teamData).map(([team, data]) => ({
-      team,
-      total: data.total6090 + data.totalNPL,
-      totalCompleted: data.completed6090 + data.completedNPL,
-      percentComplete: (data.total6090 + data.totalNPL) > 0 ? 
-        Math.round(((data.completed6090 + data.completedNPL) / (data.total6090 + data.totalNPL)) * 100) : 0,
-      cured: data.cured,
-      dr: data.dr,
-      repo: data.repo,
-      tapDeng: data.tapDeng
-    }));
-  }, [customers]);
-  
+  // เงื่อนไขสำหรับการ disable ตัวกรอง
+  const isBranchDisabled = selectedTeam !== "all";
+  const isTeamDisabled = selectedBranch !== "all";
+
   return (
     <div className="p-4 pb-20">
       {/* Header with Date Picker */}
@@ -468,7 +466,7 @@ const Performance: React.FC = () => {
           <Button 
             variant="outline" 
             size="icon"
-            onClick={handleExport}
+            onClick={handleDownload}
           >
             <Download className="h-5 w-5" />
           </Button>
@@ -477,32 +475,53 @@ const Performance: React.FC = () => {
 
       {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-        <Select value={selectedWorkGroup} onValueChange={setSelectedWorkGroup}>
+        <Select 
+          value={selectedBranch} 
+          onValueChange={setSelectedBranch}
+          disabled={isBranchDisabled}
+        >
           <SelectTrigger className="w-[140px]">
             <Filter className="h-4 w-4 mr-2" />
             <span className="truncate">
-              {selectedWorkGroup === "all" ? "กลุ่มงาน: ทั้งหมด" : 
-               selectedWorkGroup === "6090" ? "กลุ่มงาน: 6090" : 
-               "กลุ่มงาน: NPL"}
+              {selectedBranch === "all" ? "สาขา: ทั้งหมด" : `สาขา: ${selectedBranch}`}
             </span>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">กลุ่มงาน: ทั้งหมด</SelectItem>
-            <SelectItem value="6090">กลุ่มงาน: 6090</SelectItem>
-            <SelectItem value="NPL">กลุ่มงาน: NPL</SelectItem>
+            <SelectItem value="all">สาขา: ทั้งหมด</SelectItem>
+            {branches.map(branch => (
+              <SelectItem key={branch} value={branch}>สาขา: {branch}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
-        <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+        <Select 
+          value={selectedTeam} 
+          onValueChange={setSelectedTeam}
+          disabled={isTeamDisabled}
+        >
           <SelectTrigger className="w-[140px]">
             <span className="truncate">
-              {selectedTeam === "all" ? "ทีม: ทั้งหมด" : `ทีม: ${selectedTeam}`}
+              {selectedTeam === "all" ? "ทีมงาน: ทั้งหมด" : `ทีมงาน: ${selectedTeam}`}
             </span>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">ทีม: ทั้งหมด</SelectItem>
+            <SelectItem value="all">ทีมงาน: ทั้งหมด</SelectItem>
             {teamOptions.map(team => (
-              <SelectItem key={team} value={team}>ทีม: {team}</SelectItem>
+              <SelectItem key={team} value={team}>ทีมงาน: {team}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+          <SelectTrigger className="w-[140px]">
+            <span className="truncate">
+              {selectedGroup === "all" ? "กลุ่มงาน: ทั้งหมด" : 
+               selectedGroup === "6090" ? "กลุ่มงาน: 6090" : "กลุ่มงาน: NPL"}
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {groups.map(group => (
+              <SelectItem key={group.value} value={group.value}>{group.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -522,52 +541,69 @@ const Performance: React.FC = () => {
             <SelectItem value="year">ปีนี้</SelectItem>
           </SelectContent>
         </Select>
+
+        <Button
+          onClick={() => fileInputRef.current?.click()}
+          className="px-4 py-2 bg-[#1E3A8A] text-white rounded-md hover:bg-[#162A6B] transition"
+        >
+          อิมพอร์ต Excel
+        </Button>
+        <Button
+          onClick={handleDownload}
+          className="px-4 py-2 bg-[#F97316] text-white rounded-md hover:bg-[#E55B13] transition"
+        >
+          ดาวน์โหลด Excel
+        </Button>
+        <input
+          type="file"
+          accept=".xlsx"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={handleUpload}
+        />
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <Card className="border-l-4 border-l-tedtam-blue card-shadow">
+        <Card className={`border-l-4 ${summaryStats.gradeMonth === 'A' ? 'border-l-green-500' : 
+                                        summaryStats.gradeMonth === 'B' ? 'border-l-blue-500' : 
+                                        summaryStats.gradeMonth === 'C' ? 'border-l-yellow-500' : 
+                                        summaryStats.gradeMonth === 'D' ? 'border-l-orange-500' : 
+                                        'border-l-red-500'} card-shadow`}>
           <CardContent className="p-3">
-            <p className="text-sm text-gray-500">งานทั้งหมด</p>
-            <p className="text-xl font-bold">
-              {realStats.total || totalStats.totalAssigned6090 + totalStats.totalAssignedNPL}
-            </p>
-            <p className="text-xs text-gray-400">เป้าหมาย {(realStats.total || (totalStats.totalAssigned6090 + totalStats.totalAssignedNPL)) + 20} ราย</p>
+            <p className="text-sm text-gray-500">เกรด/เดือน (A,B,C,D,E)</p>
+            <p className="text-xl font-bold">{summaryStats.gradeMonth}</p>
+            <p className="text-xs text-gray-400">เป้าหมาย: A</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-green-500 card-shadow">
           <CardContent className="p-3">
-            <p className="text-sm text-gray-500">จบงานแล้ว</p>
-            <p className="text-xl font-bold">
-              {realStats.completed || totalStats.totalCompleted6090 + totalStats.totalCompletedNPL}
-            </p>
-            <p className="text-xs text-green-500 font-medium">
-              {realStats.completionRate || Math.round(((totalStats.totalCompleted6090 + totalStats.totalCompletedNPL) / 
-                       (totalStats.totalAssigned6090 + totalStats.totalAssignedNPL)) * 100)}%
-            </p>
+            <p className="text-sm text-gray-500">Score/เดือน</p>
+            <p className="text-xl font-bold">{formatNumber(summaryStats.scoreMonth)}</p>
+            <div className="flex items-center gap-1 mt-1">
+              <Activity className="h-3 w-3 text-green-500" />
+            </div>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-tedtam-orange card-shadow">
+        <Card className={`border-l-4 ${summaryStats.gradeThreeMonths === 'A' ? 'border-l-green-500' : 
+                                        summaryStats.gradeThreeMonths === 'B' ? 'border-l-blue-500' : 
+                                        summaryStats.gradeThreeMonths === 'C' ? 'border-l-yellow-500' : 
+                                        summaryStats.gradeThreeMonths === 'D' ? 'border-l-orange-500' : 
+                                        'border-l-red-500'} card-shadow`}>
           <CardContent className="p-3">
-            <p className="text-sm text-gray-500">Principle</p>
-            <p className="text-xl font-bold">
-              {formatNumber(realStats.totalAmount || totalStats.totalCured)}
-            </p>
+            <p className="text-sm text-gray-500">เกรด/3เดือน (A,B,C,D,E)</p>
+            <p className="text-xl font-bold">{summaryStats.gradeThreeMonths}</p>
             <div className="flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3 text-green-500" />
-              <p className="text-xs text-green-500">+12% จากเดือนก่อน</p>
             </div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-purple-500 card-shadow">
           <CardContent className="p-3">
-            <p className="text-sm text-gray-500">คอมมิชชัน</p>
-            <p className="text-xl font-bold">
-              {formatNumber(realStats.commission || totalStats.totalCured * 0.03)}
-            </p>
+            <p className="text-sm text-gray-500">Score/3เดือน</p>
+            <p className="text-xl font-bold">{formatNumber(summaryStats.scoreThreeMonths)}</p>
             <div className="flex items-center">
               <Award className="h-3 w-3 text-purple-500 mr-1" />
-              <p className="text-xs text-purple-500">เพิ่มขึ้น 8%</p>
             </div>
           </CardContent>
         </Card>
@@ -591,405 +627,182 @@ const Performance: React.FC = () => {
         </TabsList>
         
         <TabsContent value="summary">
-          <Card className="card-shadow mb-3">
-            <CardContent className="p-3">
-              <h3 className="font-medium mb-2 text-sm">ความคืบหน้า</h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>CURED</span>
-                    <span>{realStats.curedPercent || 67}%</span>
+          {filteredPerformanceData.length === 0 ? (
+            <Card className="card-shadow">
+              <CardContent className="p-3">
+                <p className="text-center text-gray-500">ไม่มีข้อมูลที่ตรงกับตัวกรอง กรุณาลองเปลี่ยนตัวกรองหรืออัพโหลดข้อมูลใหม่</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card className="card-shadow mb-3">
+                <CardContent className="p-3">
+                  <h3 className="font-medium mb-2 text-sm">ผลงาน</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>CURED</span>
+                        <span>{progressStats.curedPercent.toFixed(1)}%</span>
+                      </div>
+                      <Progress value={progressStats.curedPercent} className="h-2" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>DR</span>
+                        <span>{progressStats.drPercent.toFixed(1)}%</span>
+                      </div>
+                      <Progress value={progressStats.drPercent} className="h-2 bg-secondary [&>div]:bg-blue-500" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>ตบเด้ง</span>
+                        <span>{progressStats.tapDengPercent.toFixed(1)}%</span>
+                      </div>
+                      <Progress value={progressStats.tapDengPercent} className="h-2 bg-secondary [&>div]:bg-purple-500" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>REPO</span>
+                        <span>{progressStats.repoPercent.toFixed(1)}%</span>
+                      </div>
+                      <Progress value={progressStats.repoPercent} className="h-2 bg-secondary [&>div]:bg-red-500" />
+                    </div>
                   </div>
-                  <Progress value={realStats.curedPercent || 67} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>DR</span>
-                    <span>{realStats.drPercent || 23}%</span>
-                  </div>
-                  <Progress value={realStats.drPercent || 23} className="h-2 bg-secondary [&>div]:bg-blue-500" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>REPO</span>
-                    <span>{realStats.repoPercent || 8}%</span>
-                  </div>
-                  <Progress value={realStats.repoPercent || 8} className="h-2 bg-secondary [&>div]:bg-red-500" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>ตบเด้ง</span>
-                    <span>{realStats.tapDengPercent || 2}%</span>
-                  </div>
-                  <Progress value={realStats.tapDengPercent || 2} className="h-2 bg-secondary [&>div]:bg-purple-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          <Card className="card-shadow">
-            <CardContent className="p-3">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium text-sm">สถิติงานรวม</h3>
-                <div className="flex">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className={`h-7 text-xs px-2 ${detailView === "all" ? "bg-gray-100" : ""}`}
-                    onClick={() => setDetailView("all")}
-                  >
-                    ทั้งหมด
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className={`h-7 text-xs px-2 ${detailView === "6090" ? "bg-gray-100" : ""}`}
-                    onClick={() => setDetailView("6090")}
-                  >
-                    6090
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className={`h-7 text-xs px-2 ${detailView === "npl" ? "bg-gray-100" : ""}`}
-                    onClick={() => setDetailView("npl")}
-                  >
-                    NPL
-                  </Button>
-                </div>
-              </div>
-              
-              {/* แสดงค่าตามที่กรอง */}
-              {(() => {
-                const stats = getFilteredStats(detailView);
-                return (
+              <Card className="card-shadow">
+                <CardContent className="p-3">
+                  <h3 className="font-medium mb-2 text-sm">เป้าหมายที่ยังขาด</h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-gray-50 rounded-md p-2">
-                      <p className="text-xs text-gray-500">งานที่ได้รับ</p>
-                      <p className="text-lg font-bold">{stats.assigned}</p>
+                      <p className="text-xs text-gray-500">dif(Total CURED)</p>
+                      <p className="text-lg font-bold">{formatNumber(difStats.difCured)}</p>
                     </div>
                     <div className="bg-gray-50 rounded-md p-2">
-                      <p className="text-xs text-gray-500">จบแล้ว</p>
-                      <p className="text-lg font-bold">{stats.completed}</p>
+                      <p className="text-xs text-gray-500">dif(DR)</p>
+                      <p className="text-lg font-bold">{formatNumber(difStats.difDR)}</p>
                     </div>
                     <div className="bg-gray-50 rounded-md p-2">
-                      <p className="text-xs text-gray-500">คงเหลือ</p>
-                      <p className="text-lg font-bold">{stats.remaining}</p>
+                      <p className="text-xs text-gray-500">dif(ตบเด้ง)</p>
+                      <p className="text-lg font-bold">{formatNumber(difStats.difTapDeng)}</p>
                     </div>
                     <div className="bg-gray-50 rounded-md p-2">
-                      <p className="text-xs text-gray-500">ทำได้</p>
-                      <p className="text-lg font-bold text-green-500">{stats.percent}%</p>
+                      <p className="text-xs text-gray-500">dif(REPO)</p>
+                      <p className="text-lg font-bold">{formatNumber(difStats.difRepo)}</p>
                     </div>
                   </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
-        
+
         <TabsContent value="byTeam">
-          <div className="space-y-4">
-            {/* แสดงข้อมูลจาก teamPerformance แทน */}
-            {(teamPerformance.length > 0 ? teamPerformance : filteredPerformanceData).map((item, index) => {
-              const team = "team" in item ? item : {
-                team: item["ทีมลพท"],
-                total: item["กลุ่มงาน6090รับงาน(จำนวน)"] + item["กลุ่มงานNPLรับงาน(จำนวน)"],
-                totalCompleted: (item["กลุ่มงาน6090รับงาน(จำนวน)"] - item["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                              (item["กลุ่มงานNPLรับงาน(จำนวน)"] - item["กลุ่มงานNPLคงเหลือ(จำนวน)"]),
-                percentComplete: Math.round(((item["กลุ่มงาน6090รับงาน(จำนวน)"] - item["กลุ่มงาน6090คงเหลือ(จำนวน)"]) + 
-                                           (item["กลุ่มงานNPLรับงาน(จำนวน)"] - item["กลุ่มงานNPLคงเหลือ(จำนวน)"])) /
-                                           (item["กลุ่มงาน6090รับงาน(จำนวน)"] + item["กลุ่มงานNPLรับงาน(จำนวน)"]) * 100),
-                cured: item["6090ต้องเก็บงานกลุ่ม(Toral CURED)"],
-                dr: item["6090ต้องเก็บงานกลุ่ม(DR)"] + item["NPLต้องเก็บงานกลุ่ม(DR)"],
-                repo: item["6090ต้องเก็บงานกลุ่ม(REPO)"] + item["NPLต้องเก็บงานกลุ่ม(REPO)"],
-                tapDeng: item["6090ต้องเก็บงานกลุ่ม(ตบเด้ง)"] + item["NPLต้องเก็บงานกลุ่ม(ตบเด้ง)"]
-              };
-              
-              return (
-                <Card key={index} className="card-shadow">
-                  <CardContent className="p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center">
-                        <Badge className={`${index % 2 === 0 ? 'bg-tedtam-blue' : 'bg-tedtam-orange'} mr-2`}>
-                          {team.team.charAt(0)}
-                        </Badge>
-                        <h3 className="font-medium text-sm">ทีม {team.team}</h3>
+          {filteredPerformanceData.length === 0 ? (
+            <Card className="card-shadow">
+              <CardContent className="p-3">
+                <p className="text-center text-gray-500">ไม่มีข้อมูลที่ตรงกับตัวกรอง กรุณาลองเปลี่ยนตัวกรองหรืออัพโหลดข้อมูลใหม่</p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredPerformanceData.map((team, index) => (
+              <Card key={index} className="card-shadow mb-3">
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium text-sm">{team.ทีมลพท}</h3>
+                    <Badge variant={team["เกรดเดือน(6090)"] === "A" ? "success" : "secondary"}>
+                      {team["เกรดเดือน(6090)"]}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>CURED</span>
+                        <span>{(team["ผลงาน(6090)(%Toral CURED)"] * 100).toFixed(1)}%</span>
                       </div>
-                      
-                      {/* เพิ่มปุ่มกรองข้อมูลตามกลุ่มงาน */}
-                      <div className="flex">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 text-xs px-2"
-                          onClick={() => setDetailView("all")}
-                        >
-                          ทั้งหมด
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 text-xs px-2"
-                          onClick={() => setDetailView("6090")}
-                        >
-                          6090
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 text-xs px-2"
-                          onClick={() => setDetailView("npl")}
-                        >
-                          NPL
-                        </Button>
-                      </div>
+                      <Progress value={team["ผลงาน(6090)(%Toral CURED)"] * 100} className="h-2" />
                     </div>
-                    
-                    <div className="space-y-2 mb-3">
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span>ความคืบหน้า ({team.totalCompleted}/{team.total})</span>
-                          <span>{team.percentComplete}%</span>
-                        </div>
-                        <Progress value={team.percentComplete} className="h-2" />
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>DR</span>
+                        <span>{(team["ผลงาน(6090)(%DR)"] * 100).toFixed(1)}%</span>
                       </div>
+                      <Progress value={team["ผลงาน(6090)(%DR)"] * 100} className="h-2 bg-secondary [&>div]:bg-blue-500" />
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">CURED</p>
-                        <p className="font-medium">{formatNumber(team.cured || 0)}</p>
-                        <Progress value={Math.min(team.cured / 50000, 100)} className="h-1 mt-1" />
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>ตบเด้ง</span>
+                        <span>{(team["ผลงาน(6090)(%ตบเด้ง)"] * 100).toFixed(1)}%</span>
                       </div>
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">DR</p>
-                        <p className="font-medium">{formatNumber(team.dr || 0)}</p>
-                        <Progress 
-                          value={Math.min(team.dr / 10000, 100)} 
-                          className="h-1 mt-1 [&>div]:bg-blue-500" 
-                        />
-                      </div>
+                      <Progress value={team["ผลงาน(6090)(%ตบเด้ง)"] * 100} className="h-2 bg-secondary [&>div]:bg-purple-500" />
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">REPO</p>
-                        <p className="font-medium">{formatNumber(team.repo || 0)}</p>
-                        <Progress 
-                          value={Math.min(Math.abs(team.repo) / 10000, 100)} 
-                          className="h-1 mt-1 [&>div]:bg-red-500" 
-                        />
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>REPO</span>
+                        <span>{(team["ผลงาน(6090)(%REPO)"] * 100).toFixed(1)}%</span>
                       </div>
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">ตบเด้ง</p>
-                        <p className="font-medium">{formatNumber(team.tapDeng || 0)}</p>
-                        <Progress 
-                          value={Math.min(Math.abs(team.tapDeng) / 10000, 100)} 
-                          className="h-1 mt-1 [&>div]:bg-purple-500" 
-                        />
-                      </div>
+                      <Progress value={team["ผลงาน(6090)(%REPO)"] * 100} className="h-2 bg-secondary [&>div]:bg-red-500" />
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </TabsContent>
-        
+
         <TabsContent value="detail">
-          <div className="flex justify-end mb-2">
-            <div className="flex">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`h-7 text-xs px-2 ${detailView === "all" ? "bg-gray-100" : ""}`}
-                onClick={() => setDetailView("all")}
-              >
-                ทั้งหมด
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`h-7 text-xs px-2 ${detailView === "6090" ? "bg-gray-100" : ""}`}
-                onClick={() => setDetailView("6090")}
-              >
-                6090
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`h-7 text-xs px-2 ${detailView === "npl" ? "bg-gray-100" : ""}`}
-                onClick={() => setDetailView("npl")}
-              >
-                NPL
-              </Button>
-            </div>
-          </div>
-          
           <Card className="card-shadow">
             <CardContent className="p-3">
-              <div className="overflow-x-auto">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-medium text-sm">ตารางข้อมูล</h3>
+                <Select value={detailView} onValueChange={setDetailView}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">ทั้งหมด</SelectItem>
+                    <SelectItem value="6090">กลุ่มงาน 6090</SelectItem>
+                    <SelectItem value="npl">กลุ่มงาน NPL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {filteredPerformanceData.length === 0 ? (
+                <p className="text-center text-gray-500">ไม่มีข้อมูลที่ตรงกับตัวกรอง กรุณาลองเปลี่ยนตัวกรองหรืออัพโหลดข้อมูลใหม่</p>
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>ทีม</TableHead>
-                      <TableHead className="text-right">รับงาน</TableHead>
-                      <TableHead className="text-right">จบแล้ว</TableHead>
-                      <TableHead className="text-right">%</TableHead>
-                      <TableHead className="text-right">คงเหลือ</TableHead>
+                      <TableHead>กลุ่มงาน</TableHead>
+                      {detailView !== "npl" && <TableHead>รับงาน (6090)</TableHead>}
+                      {detailView !== "npl" && <TableHead>คงเหลือ (6090)</TableHead>}
+                      {detailView !== "npl" && <TableHead>% CURED (6090)</TableHead>}
+                      {detailView !== "6090" && <TableHead>รับงาน (NPL)</TableHead>}
+                      {detailView !== "6090" && <TableHead>คงเหลือ (NPL)</TableHead>}
+                      {detailView !== "6090" && <TableHead>% CURED (NPL)</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {/* แสดงตามฟิลเตอร์ที่เลือกไว้ */}
-                    {filteredPerformanceData.map((team, index) => {
-                      let assigned = 0;
-                      let completed = 0;
-                      let remaining = 0;
-                      let percentage = 0;
-                      
-                      if (detailView === "all" || detailView === "6090") {
-                        assigned += team["กลุ่มงาน6090รับงาน(จำนวน)"];
-                        completed += (team["กลุ่มงาน6090รับงาน(จำนวน)"] - team["กลุ่มงาน6090คงเหลือ(จำนวน)"]);
-                        remaining += team["กลุ่มงาน6090คงเหลือ(จำนวน)"];
-                      }
-                      
-                      if (detailView === "all" || detailView === "npl") {
-                        assigned += team["กลุ่มงานNPLรับงาน(จำนวน)"];
-                        completed += (team["กลุ่มงานNPLรับงาน(จำนวน)"] - team["กลุ่มงานNPLคงเหลือ(จำนวน)"]);
-                        remaining += team["กลุ่มงานNPLคงเหลือ(จำนวน)"];
-                      }
-                      
-                      percentage = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
-                      
-                      return (
-                        <TableRow key={index}>
-                          <TableCell className="font-medium">{team["ทีมลพท"]}</TableCell>
-                          <TableCell className="text-right">{assigned}</TableCell>
-                          <TableCell className="text-right">{completed}</TableCell>
-                          <TableCell className="text-right text-green-500 font-medium">{percentage}%</TableCell>
-                          <TableCell className="text-right">{remaining}</TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {filteredPerformanceData.map((team, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{team.ทีมลพท}</TableCell>
+                        <TableCell>{team.กลุ่มงาน}</TableCell>
+                        {detailView !== "npl" && <TableCell>{team["กลุ่มงาน6090รับงาน(จำนวน)"]}</TableCell>}
+                        {detailView !== "npl" && <TableCell>{team["กลุ่มงาน6090คงเหลือ(จำนวน)"]}</TableCell>}
+                        {detailView !== "npl" && <TableCell>{(team["ผลงาน(6090)(%Toral CURED)"] * 100).toFixed(1)}%</TableCell>}
+                        {detailView !== "6090" && <TableCell>{team["กลุ่มงานNPLรับงาน(จำนวน)"]}</TableCell>}
+                        {detailView !== "6090" && <TableCell>{team["กลุ่มงานNPLคงเหลือ(จำนวน)"]}</TableCell>}
+                        {detailView !== "6090" && <TableCell>{(team["ผลงาน(NPL)(%Toral CURED)"] * 100).toFixed(1)}%</TableCell>}
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="charts">
-          <div className="flex justify-end mb-2">
-            <div className="flex">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`h-7 text-xs px-2 ${detailView === "all" ? "bg-gray-100" : ""}`}
-                onClick={() => setDetailView("all")}
-              >
-                ทั้งหมด
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`h-7 text-xs px-2 ${detailView === "6090" ? "bg-gray-100" : ""}`}
-                onClick={() => setDetailView("6090")}
-              >
-                6090
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`h-7 text-xs px-2 ${detailView === "npl" ? "bg-gray-100" : ""}`}
-                onClick={() => setDetailView("npl")}
-              >
-                NPL
-              </Button>
-            </div>
-          </div>
-          
-          <Card className="card-shadow">
-            <CardContent className="p-3">
-              <h3 className="font-medium mb-4 text-sm">กราฟแสดงผลงาน</h3>
-              <div className="h-80">
-                <ChartContainer config={{
-                  assigned: { theme: { light: "#9333ea", dark: "#d8b4fe" } },
-                  completed: { theme: { light: "#16a34a", dark: "#86efac" } },
-                  cured: { theme: { light: "#0891b2", dark: "#67e8f9" } },
-                  dr: { theme: { light: "#f97316", dark: "#fdba74" } }
-                }}>
-                  <RechartsBarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="assigned" name="งานที่ได้รับ" fill="var(--color-assigned)" />
-                    <Bar dataKey="completed" name="จบแล้ว" fill="var(--color-completed)" />
-                    <Bar dataKey="cured" name="CURED" fill="var(--color-cured)" />
-                    <Bar dataKey="dr" name="DR" fill="var(--color-dr)" />
-                    {detailView !== "6090" && (
-                      <>
-                        <Bar dataKey="tapDeng" name="ตบเด้ง" fill="#9f7aea" />
-                        <Bar dataKey="repo" name="REPO" fill="#f56565" />
-                      </>
-                    )}
-                  </RechartsBarChart>
-                </ChartContainer>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Leaderboard */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-tedtam-blue flex items-center">
-            <Award className="h-5 w-5 mr-2" />
-            อันดับผลงาน
-          </h2>
-          <Button variant="ghost" size="sm" className="text-xs text-tedtam-orange">
-            ดูทั้งหมด <ChevronDown className="h-3 w-3 ml-1" />
-          </Button>
-        </div>
-        
-        <Card className="card-shadow">
-          <CardContent className="p-0">
-            <div className="divide-y">
-              {teamPerformance
-                .sort((a, b) => b.percentComplete - a.percentComplete)
-                .slice(0, 3)
-                .map((team, i) => (
-                  <div key={i} className="flex items-center justify-between p-3">
-                    <div className="flex items-center">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 
-                        ${i === 0 ? 'bg-yellow-100 text-yellow-700' : 
-                          i === 1 ? 'bg-gray-100 text-gray-700' : 
-                          i === 2 ? 'bg-amber-100 text-amber-700' : 
-                          'bg-gray-100 text-gray-700'}`
-                        }
-                      >
-                        {i + 1}
-                      </div>
-                      <p className="font-medium">ทีม {team.team}</p>
-                    </div>
-                    <div className="flex items-center">
-                      <p className={`font-bold 
-                        ${i === 0 ? 'text-yellow-600' : 
-                          i === 1 ? 'text-gray-600' : 
-                          i === 2 ? 'text-amber-600' : 
-                          'text-gray-600'}
-                      `}>{team.percentComplete}%</p>
-                      {i === 0 && (
-                        <span className="ml-2 text-lg">🏆</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };
