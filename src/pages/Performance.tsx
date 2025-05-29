@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ExcelJS from 'exceljs';
+import { supabase } from '../supabaseClient';
 
 interface PerformanceData {
   "ประเภทงาน": string;
@@ -91,16 +92,31 @@ const Performance: React.FC = () => {
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // โหลดข้อมูลและประวัติจาก localStorage เมื่อเริ่มต้น
+  // ดึงข้อมูลจาก Supabase เมื่อเริ่มต้น
   useEffect(() => {
-    const savedData = localStorage.getItem('performanceData');
-    const savedHistory = localStorage.getItem('uploadHistory');
-    if (savedData) {
-      setPerformanceData(JSON.parse(savedData));
-    }
-    if (savedHistory) {
-      setUploadHistory(JSON.parse(savedHistory));
-    }
+    const fetchData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('performance_data')
+          .select('*');
+        
+        if (error) throw error;
+        setPerformanceData(data || []);
+      } catch (error) {
+        console.error('Error fetching data from Supabase:', error);
+        toast({ title: "เกิดข้อผิดพลาดในการดึงข้อมูล", description: "กรุณาลองใหม่ภายหลัง" });
+      }
+    };
+
+    const fetchHistory = async () => {
+      const savedHistory = localStorage.getItem('uploadHistory');
+      if (savedHistory) {
+        setUploadHistory(JSON.parse(savedHistory));
+      }
+    };
+
+    fetchData();
+    fetchHistory();
   }, []);
 
   // ตัวเลือกสำหรับตัวกรองสาขา
@@ -168,8 +184,28 @@ const Performance: React.FC = () => {
     // อัปเดตข้อมูล (แทนที่ข้อมูลเก่าด้วยข้อมูลล่าสุด)
     setPerformanceData(data);
 
-    // บันทึกข้อมูลลง localStorage
-    localStorage.setItem('performanceData', JSON.stringify(data));
+    // บันทึกข้อมูลลง Supabase
+    try {
+      // ลบข้อมูลเก่าทั้งหมดก่อน
+      const { error: deleteError } = await supabase
+        .from('performance_data')
+        .delete()
+        .neq('id', 0); // เงื่อนไขนี้เพื่อให้ลบทุกแถว (ใช้ id != 0 เพราะ id เริ่มจาก 1)
+
+      if (deleteError) throw deleteError;
+
+      // เพิ่มข้อมูลใหม่
+      const { error: insertError } = await supabase
+        .from('performance_data')
+        .insert(data);
+
+      if (insertError) throw insertError;
+
+      toast({ title: "บันทึกข้อมูลสำเร็จ" });
+    } catch (error) {
+      console.error('Error saving data to Supabase:', error);
+      toast({ title: "เกิดข้อผิดพลาดในการบันทึกข้อมูล", description: "กรุณาลองใหม่ภายหลัง" });
+    }
 
     // บันทึกประวัติการอัปโหลด
     const uploadDateTime = format(new Date(), "dd MMM yyyy HH:mm", { locale: th });
