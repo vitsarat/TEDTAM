@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ExcelJS from 'exceljs';
-import { supabase } from '../supabaseClient';
+import { performanceData, setPerformanceData } from '../data/performanceData';
 
 interface PerformanceData {
   "ประเภทงาน": string;
@@ -88,36 +88,9 @@ const Performance: React.FC = () => {
   const [selectedWorkGroup, setSelectedWorkGroup] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<string>("summary");
   const [date, setDate] = useState<Date>(new Date());
-  const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
+  const [performanceDataState, setPerformanceDataState] = useState<PerformanceData[]>(performanceData);
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ดึงข้อมูลจาก Supabase เมื่อเริ่มต้น
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('performance_data')
-          .select('*');
-        
-        if (error) throw error;
-        setPerformanceData(data || []);
-      } catch (error) {
-        console.error('Error fetching data from Supabase:', error);
-        toast({ title: "เกิดข้อผิดพลาดในการดึงข้อมูล", description: "กรุณาลองใหม่ภายหลัง" });
-      }
-    };
-
-    const fetchHistory = async () => {
-      const savedHistory = localStorage.getItem('uploadHistory');
-      if (savedHistory) {
-        setUploadHistory(JSON.parse(savedHistory));
-      }
-    };
-
-    fetchData();
-    fetchHistory();
-  }, []);
 
   // ตัวเลือกสำหรับตัวกรองสาขา
   const branchOptions = [
@@ -181,38 +154,17 @@ const Performance: React.FC = () => {
       }
     });
 
-    // อัปเดตข้อมูล (แทนที่ข้อมูลเก่าด้วยข้อมูลล่าสุด)
+    // อัปเดตข้อมูลใน performanceData.ts
     setPerformanceData(data);
 
-    // บันทึกข้อมูลลง Supabase
-    try {
-      // ลบข้อมูลเก่าทั้งหมดก่อน
-      const { error: deleteError } = await supabase
-        .from('performance_data')
-        .delete()
-        .neq('id', 0); // เงื่อนไขนี้เพื่อให้ลบทุกแถว (ใช้ id != 0 เพราะ id เริ่มจาก 1)
-
-      if (deleteError) throw deleteError;
-
-      // เพิ่มข้อมูลใหม่
-      const { error: insertError } = await supabase
-        .from('performance_data')
-        .insert(data);
-
-      if (insertError) throw insertError;
-
-      toast({ title: "บันทึกข้อมูลสำเร็จ" });
-    } catch (error) {
-      console.error('Error saving data to Supabase:', error);
-      toast({ title: "เกิดข้อผิดพลาดในการบันทึกข้อมูล", description: "กรุณาลองใหม่ภายหลัง" });
-    }
+    // อัปเดต state ในหน้าเว็บ
+    setPerformanceDataState(data);
 
     // บันทึกประวัติการอัปโหลด
     const uploadDateTime = format(new Date(), "dd MMM yyyy HH:mm", { locale: th });
     const newHistoryEntry = { fileName: file.name, uploadDateTime, itemCount: data.length };
     const updatedHistory = [...uploadHistory, newHistoryEntry];
     setUploadHistory(updatedHistory);
-    localStorage.setItem('uploadHistory', JSON.stringify(updatedHistory));
 
     toast({ title: "อัปโหลดไฟล์สำเร็จ" });
   };
@@ -256,8 +208,8 @@ const Performance: React.FC = () => {
       { header: "ผลงาน(NPL)(%REPO)", key: "ผลงาน(NPL)(%REPO)", width: 15 },
     ];
 
-    // เพิ่มข้อมูลจาก performanceData
-    performanceData.forEach(item => worksheet.addRow(item));
+    // เพิ่มข้อมูลจาก performanceDataState
+    performanceDataState.forEach(item => worksheet.addRow(item));
 
     // ดาวน์โหลดไฟล์ Excel
     const buffer = await workbook.xlsx.writeBuffer();
@@ -271,7 +223,7 @@ const Performance: React.FC = () => {
   };
 
   // ตัวกรองข้อมูล
-  const filteredPerformanceData = performanceData.filter(item => {
+  const filteredPerformanceData = performanceDataState.filter(item => {
     if (selectedBranch !== "all" && item["ประเภทงาน"] === "สาขา" && item["รายการ"] !== selectedBranch) {
       return false;
     }
